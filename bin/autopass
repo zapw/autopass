@@ -465,6 +465,9 @@ for server in "${servers[@]}" ; do
   done &
   exec 3>&-
 
+  #discard any garbage input from user while connecting
+  IFS='' read -t0.000001 -r -d'' discard
+  #while waiting for prompt allow to break and skip connection
   while kill -0 "$emptyproc" 2>/dev/null && [[ $skip != s ]] ; do read -N1 -s -t 1 skip  ; done
   if [[ $skip == s ]] ; then
       unset skip
