@@ -256,10 +256,13 @@ if (( deflg )) ; then
 fi
 	    
 if (( ! ${#servers[@]} )) && [[ -f "$confdir/servers" ]] ; then
-     mapfile -t servers <$confdir/servers
+     while read -r server ; do 
+	    [[ $server =~ ^(#|$) ]] && continue 
+	    servers+=("$server") 
+     done <$confdir/servers
 
- elif (( ! ${#servers[@]} )) ; then
-    { echo -e "server list missing in $confdir/servers\n via command line: ${0##*/} [-s servername1] [...]"; exit 1 ;}
+elif (( ! ${#servers[@]} )) ; then
+      { echo -e "server list missing in $confdir/servers\n via command line: ${0##*/} [-s servername1] [...]"; exit 1 ;}
 fi
 
 if (( ${#runjobs[@]} != 0 )) ; then
