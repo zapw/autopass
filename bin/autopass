@@ -299,17 +299,17 @@ getpass 1
 
 cleanup() {
       local pid
-      if [[ -r $tmpdir/empty.pid ]] ; then
-          read -r pid <$tmpdir/empty.pid
-          kill $pid &>/dev/null
-          while kill -0 $pid &>/dev/null; do sleep 0.5 ; done
+      if [[ -r "$tmpdir/empty.pid" ]] ; then
+          read -r pid <"$tmpdir/empty.pid"
+          kill "$pid" &>/dev/null
+          while kill -0 "$pid" &>/dev/null; do sleep 0.5 ; done
       fi
 
-      kill -0 $emptyproc &>/dev/null && kill $emptyproc &>/dev/null
-      while kill -0 $emptyproc &>/dev/null ; do 
+      kill -0 "$emptyproc" &>/dev/null && kill "$emptyproc" &>/dev/null
+      while kill -0 "$emptyproc" &>/dev/null ; do 
            sleep 0.5
       done
-      rm $tmpdir/{in,out}.fifo $tmpdir/empty.pid 2>/dev/null
+      rm "$tmpdir"/{in,out}.fifo "$tmpdir/empty.pid" 2>/dev/null
 
       [[ -f "$repliweblicfile" ]] && rm "$repliweblicfile"
       [[ $1 = all ]] && rm -rf "$tmpdir"
@@ -319,17 +319,17 @@ trap "cleanup all" EXIT
 
 getsudo() {
   local returnval
-  echo "read -r -s -p Getsudo$'\n' -a sudopass" | empty -s -o $tmpdir/in.fifo
-  empty -w -i $tmpdir/out.fifo -o $tmpdir/in.fifo Getsudo
+  echo "read -r -s -p Getsudo$'\n' -a sudopass" | empty -s -o "$tmpdir/in.fifo"
+  empty -w -i "$tmpdir/out.fifo" -o "$tmpdir/in.fifo" Getsudo
   returnval=$?
 
   if (( returnval == 1 )) ; then
-      echo "${password[@]}" | empty -s -o $tmpdir/in.fifo 
+      echo "${password[@]}" | empty -s -o "$tmpdir/in.fifo"
 
-      empty -w -i $tmpdir/out.fifo -o $tmpdir/in.fifo '_prompt_'
+      empty -w -i "$tmpdir/out.fifo" -o "$tmpdir/in.fifo" '_prompt_'
       echo 'printf "%s\n" "${sudopass[@]}" | sudo -S -v' | empty -s -o $tmpdir/in.fifo
 
-      empty -w -i $tmpdir/out.fifo -o $tmpdir/in.fifo 'incorrect password attempts' '' 'may not run sudo on' '' '_prompt_' ''	
+      empty -w -i "$tmpdir/out.fifo" -o "$tmpdir/in.fifo" 'incorrect password attempts' '' 'may not run sudo on' '' '_prompt_' ''	
       returnval=$?
 
       if (( returnval == 1 )) ; then
@@ -344,8 +344,8 @@ getsudo() {
 
       elif (( returnval == 3 )) ; then
             #refresh our sudo cache every few minutes, in the background
-            empty -s -o $tmpdir/in.fifo 'while kill -0 $PPID ; do sleep 120; sudo -v; done &\n'
-            echo "unset sudopass" | empty -s -o $tmpdir/in.fifo 
+            empty -s -o "$tmpdir/in.fifo" 'while kill -0 $PPID ; do sleep 120; sudo -v; done &\n'
+            echo "unset sudopass" | empty -s -o "$tmpdir/in.fifo"
       else
            echo unable to match keyphrase to sudo prompt
            exit 1
@@ -361,20 +361,20 @@ getsudo() {
 }
 
 exit_noninteractiveshell () {
-  empty -w -t 60 -i $tmpdir/out.fifo -o $tmpdir/in.fifo "done" "exit\n"
-  empty -s -o $tmpdir/in.fifo "echo\n"
-  empty -s -o $tmpdir/in.fifo "echo\n"
-  empty -w -t 500 -i $tmpdir/out.fifo -o $tmpdir/in.fifo "_prompt_"
+  empty -w -t 60 -i "$tmpdir/out.fifo" -o "$tmpdir/in.fifo" "done" "exit\n"
+  empty -s -o "$tmpdir/in.fifo" "echo\n"
+  empty -s -o "$tmpdir/in.fifo" "echo\n"
+  empty -w -t 500 -i "$tmpdir/out.fifo" -o "$tmpdir/in.fifo" "_prompt_"
 }
 
 repliwebinst() {
   local component
   
-  empty -s -o $tmpdir/in.fifo "cat | sudo /bin/bash\n"
-  empty -s -o $tmpdir/in.fifo "printf '\n%s\n' '###begin##repliweb###'\n"
-  empty -w -i $tmpdir/out.fifo -o $tmpdir/in.fifo '###begin##repliweb###'
-  empty -s -o $tmpdir/in.fifo "echo Host is \$HOSTNAME\n"
-  empty -w -i $tmpdir/out.fifo -o $tmpdir/in.fifo 'web1($|\.)' '' '.*' ''
+  empty -s -o "$tmpdir/in.fifo" "cat | sudo /bin/bash\n"
+  empty -s -o "$tmpdir/in.fifo" "printf '\n%s\n' '###begin##repliweb###'\n"
+  empty -w -i "$tmpdir/out.fifo" -o "$tmpdir/in.fifo" '###begin##repliweb###'
+  empty -s -o "$tmpdir/in.fifo" "echo Host is \$HOSTNAME\n"
+  empty -w -i "$tmpdir/out.fifo" -o "$tmpdir/in.fifo" 'web1($|\.)' '' '.*' ''
 
   returnval=$?
   [[ $returnval = 1 ]] && component=(center)
@@ -382,42 +382,42 @@ repliwebinst() {
 
   echo -e "Configuring as ${component[@]^*}\n"
 
-  empty -s -o $tmpdir/in.fifo <"$confdir/repliweb/setup"
+  empty -s -o "$tmpdir/in.fifo" <"$confdir/repliweb/setup"
 
   exit_noninteractiveshell
 
-  empty -s -o $tmpdir/in.fifo "pushd \$HOME/repliweb/\n"
-  empty -s -o $tmpdir/in.fifo "sudo ./install\n"
+  empty -s -o "$tmpdir/in.fifo" "pushd \$HOME/repliweb/\n"
+  empty -s -o "$tmpdir/in.fifo" "sudo ./install\n"
 
-  empty -w -t 30 -i $tmpdir/out.fifo -o $tmpdir/in.fifo "press any other key." "\n"
-  empty -w -i $tmpdir/out.fifo -o $tmpdir/in.fifo "installation directory" "\n"
-  empty -w -i $tmpdir/out.fifo -o $tmpdir/in.fifo "path has write permissions" "\n"
-  empty -w -i $tmpdir/out.fifo -o $tmpdir/in.fifo "perform a standard installation" "n\n"
-  empty -w -i $tmpdir/out.fifo -o $tmpdir/in.fifo "Console[[:space:]]+y/n" "n\n"
+  empty -w -t 30 -i "$tmpdir/out.fifo" -o "$tmpdir/in.fifo" "press any other key." "\n"
+  empty -w -i "$tmpdir/out.fifo" -o "$tmpdir/in.fifo" "installation directory" "\n"
+  empty -w -i "$tmpdir/out.fifo" -o "$tmpdir/in.fifo" "path has write permissions" "\n"
+  empty -w -i "$tmpdir/out.fifo" -o "$tmpdir/in.fifo" "perform a standard installation" "n\n"
+  empty -w -i "$tmpdir/out.fifo" -o "$tmpdir/in.fifo" "Console[[:space:]]+y/n" "n\n"
   if inarray "center" "${component[@]}" ; then
-	   empty -w -i $tmpdir/out.fifo -o $tmpdir/in.fifo "Center[[:space:]]+y/n" "y\n"
-	   empty -w -i $tmpdir/out.fifo -o $tmpdir/in.fifo "Edge[[:space:]]+y/n" "n\n"
+	   empty -w -i "$tmpdir/out.fifo" -o "$tmpdir/in.fifo" "Center[[:space:]]+y/n" "y\n"
+	   empty -w -i "$tmpdir/out.fifo" -o "$tmpdir/in.fifo" "Edge[[:space:]]+y/n" "n\n"
   elif inarray "edge" "${component[@]}" ; then  
-	   empty -w -i $tmpdir/out.fifo -o $tmpdir/in.fifo "Center[[:space:]]+y/n" "n\n"
-	   empty -w -i $tmpdir/out.fifo -o $tmpdir/in.fifo "Edge[[:space:]]+y/n" "y\n"
+	   empty -w -i "$tmpdir/out.fifo" -o "$tmpdir/in.fifo" "Center[[:space:]]+y/n" "n\n"
+	   empty -w -i "$tmpdir/out.fifo" -o "$tmpdir/in.fifo" "Edge[[:space:]]+y/n" "y\n"
   fi
-  empty -w -t 120 -i $tmpdir/out.fifo -o $tmpdir/in.fifo "email notification" "n\n" ".*" "" 
+  empty -w -t 120 -i "$tmpdir/out.fifo" -o "$tmpdir/in.fifo" "email notification" "n\n" ".*" "" 
 
   [[ $? = 255 ]] && { echo aborting; exit 1 ;}
 
   #wait for repliweb installation to finish.
-  empty -w -t 3600 -i $tmpdir/out.fifo -o $tmpdir/in.fifo "_prompt_"
+  empty -w -t 3600 -i "$tmpdir/out.fifo" -o "$tmpdir/in.fifo" "_prompt_"
 
   #copy license
-  empty -s -o $tmpdir/in.fifo "sudo sh -c 'cat >/usr/repliweb/rds/license/lic_repliweb.rw' <<EOF\n"
-  cat <"$repliweblicfile" | empty -s -o $tmpdir/in.fifo
-  empty -s -o $tmpdir/in.fifo "EOF\n"
-  empty -s -o $tmpdir/in.fifo "sudo cp /usr/repliweb/rds/license/lic_repliweb.rw /usr/repliweb/r1/license/lic_repliweb.rw\n"
+  empty -s -o "$tmpdir/in.fifo" "sudo sh -c 'cat >/usr/repliweb/rds/license/lic_repliweb.rw' <<EOF\n"
+  cat <"$repliweblicfile" | empty -s -o "$tmpdir/in.fifo"
+  empty -s -o "$tmpdir/in.fifo" "EOF\n"
+  empty -s -o "$tmpdir/in.fifo" "sudo cp /usr/repliweb/rds/license/lic_repliweb.rw /usr/repliweb/r1/license/lic_repliweb.rw\n"
 }
 
 tail_pid () {
   local pid
-  read -r pid <$tmpdir/empty.pid || { echo failed to read 'empty' pid; exit 1; }
+  read -r pid <"$tmpdir/empty.pid" || { echo failed to read 'empty' pid; exit 1; }
   #check if empty is alive
   kill -0 "$pid" 2>/dev/null || exit 1 
 }
@@ -440,7 +440,7 @@ for server in "${servers[@]}" ; do
   #connect to the server
   if (( $stflg != 1 )) ; then
       banner="connecting to server"
-      bannerlength=$((${#banner} + 1))
+      bannerlength="$((${#banner} + 1))"
       serverlength="${#server}"
       printf "\n\n%s\n%${bannerlength}s" "$banner $server" " "
       printf "%${serverlength}s" " " | tr " " "*"
@@ -452,7 +452,7 @@ for server in "${servers[@]}" ; do
 	tail_pid
 
   #check if succesfully logged or if we got a password prompt
-  empty -w -t "$conntimeo" -i $tmpdir/out.fifo -o $tmpdir/in.fifo '_prompt_' '' assword '' 'Enter passphrase for key' '' &
+  empty -w -t "$conntimeo" -i "$tmpdir/out.fifo" -o "$tmpdir/in.fifo" '_prompt_' '' assword '' 'Enter passphrase for key' '' &
   emptyproc=$!
 
   i="$conntimeo"
