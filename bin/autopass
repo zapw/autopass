@@ -10,7 +10,7 @@ repliwebinstall=true
 newusers=false
 tmpdir="$(mktemp -d)" || exit 1
 
-. $confdir/config
+. "$confdir/config"
 
 usage() {
 cat <<EOF
@@ -71,12 +71,12 @@ inarray() {
 install_pkg () {
   local package pkg
   for package; do
-      [[ ! -x $package ]] && pkg+=($package)
+      [[ ! -x "$package" ]] && pkg+=("$package")
   done
   if ((${#pkg[@]})) ; then
        echo Installing missing binaries: "${pkg[@]}"
-       [[ -f /etc/redhat-release ]] && sudo yum install -y  ${pkg[@]##*/}
-       [[ -f /etc/debian_version ]] && sudo apt-get install ${pkg[@]##*/}
+       [[ -f /etc/redhat-release ]] && sudo yum install -y  "${pkg[@]##*/}"
+       [[ -f /etc/debian_version ]] && sudo apt-get install "${pkg[@]##*/}"
   fi
 }
 
@@ -259,7 +259,7 @@ if (( ! ${#servers[@]} )) && [[ -f "$confdir/servers" ]] ; then
      while read -r server ; do 
 	    [[ $server =~ ^(#|$) ]] && continue 
 	    servers+=("$server") 
-     done <$confdir/servers
+     done <"$confdir/servers"
 
 elif (( ! ${#servers[@]} )) ; then
       { echo -e "server list missing in $confdir/servers\n via command line: ${0##*/} [-s servername1] [...]"; exit 1 ;}
@@ -423,15 +423,15 @@ tail_pid () {
 }
 
 #iterate through the servers list
-for server in ${servers[@]} ; do
+for server in "${servers[@]}" ; do
   if [[ $repliwebinstall = true ]] ; then
-       repliweblicfile=($repliweblic/*${server%.prod*}/lic_repliweb.rw)
+       repliweblicfile=("$repliweblic/*${server%.prod*}/lic_repliweb.rw")
        if [[ ! -f "$repliweblicfile" ]] ; then
            echo "can't find repliweb lic_repliweb.rw for ${server%.prod*} in $repliweblic"
            exit 1
        fi
-       if cp "$repliweblicfile" /tmp/${server%.prod*}-lic_repliweb.rw && dos2unix /tmp/${server%.prod*}-lic_repliweb.rw ; then
-           repliweblicfile=/tmp/${server%.prod*}-lic_repliweb.rw
+       if cp "$repliweblicfile" "/tmp/${server%.prod*}-lic_repliweb.rw" && dos2unix "/tmp/${server%.prod*}-lic_repliweb.rw" ; then
+           repliweblicfile="/tmp/${server%.prod*}-lic_repliweb.rw"
        else
            exit 1
        fi
@@ -447,8 +447,8 @@ for server in ${servers[@]} ; do
   fi
 
   export SSH_AGENT_PID=$SSH_AGENT_PID SSH_AUTH_SOCK=$SSH_AUTH_SOCK
-  empty -f -i $tmpdir/in.fifo -o $tmpdir/out.fifo -p $tmpdir/empty.pid "${defaultargs[@]}" "${logparam[@]}" \
-	ssh -o ConnectTimeout="$conntimeo" -t -o stricthostkeychecking=no $user@$server "PS1='_prompt_ ' /bin/bash --norc" || exit 1
+  empty -f -i "$tmpdir/in.fifo" -o "$tmpdir/out.fifo" -p "$tmpdir/empty.pid" "${defaultargs[@]}" "${logparam[@]}" \
+	ssh -o ConnectTimeout="$conntimeo" -t -o stricthostkeychecking=no "$user@$server" "PS1='_prompt_ ' /bin/bash --norc" || exit 1
 	tail_pid
 
   #check if succesfully logged or if we got a password prompt
@@ -478,23 +478,23 @@ for server in ${servers[@]} ; do
   returnval=$?
   if (( returnval == 3 )) ; then
        #fall back to password authentication
-       empty -s -o $tmpdir/in.fifo "\n"
+       empty -s -o "$tmpdir/in.fifo" "\n"
 
-       empty -w -i $tmpdir/out.fifo -o $tmpdir/in.fifo '_prompt_' '' assword
+       empty -w -i "$tmpdir/out.fifo" -o "$tmpdir/in.fifo" '_prompt_' '' assword
        returnval=$?
   fi
   
   if (( returnval == 2 )) ; then
-      echo "${password[password]}" | empty -s -o $tmpdir/in.fifo 
+      echo "${password[password]}" | empty -s -o "$tmpdir/in.fifo" 
       #recheck for login status
-      empty -w -i $tmpdir/out.fifo -o $tmpdir/in.fifo '_prompt_' '' assword
+      empty -w -i "$tmpdir/out.fifo" -o "$tmpdir/in.fifo" '_prompt_' '' assword
 
       returnval=$?
       if (( returnval == 2 )) ; then
           #try second password
-          echo "${password[password1]}" | empty -s -o $tmpdir/in.fifo 
+          echo "${password[password1]}" | empty -s -o "$tmpdir/in.fifo"
           #recheck for login status
-          empty -w -i $tmpdir/out.fifo -o $tmpdir/in.fifo '_prompt_' '' assword
+          empty -w -i "$tmpdir/out.fifo" -o "$tmpdir/in.fifo" '_prompt_' '' assword
 
           returnval=$?
 	  #both passwords failed.
@@ -522,17 +522,17 @@ for server in ${servers[@]} ; do
   joblist=("$enableddir/"*)
   shopt -u nullglob
   if (( ${#joblist[@]} || ${#runjobs[@]} )) ; then
-       empty -s -o $tmpdir/in.fifo "cat | sudo /bin/bash\n"
-       empty -s -o $tmpdir/in.fifo "echo -e '\n###Starting Jobs###'\n"
+       empty -s -o "$tmpdir/in.fifo" "cat | sudo /bin/bash\n"
+       empty -s -o "$tmpdir/in.fifo" "echo -e '\n###Starting Jobs###'\n"
        #Wait for the keyword, until remote terminal is ready to receive more input commands.
-       empty -w -t 3600 -i $tmpdir/out.fifo -o $tmpdir/in.fifo Jobs
+       empty -w -t 3600 -i "$tmpdir/out.fifo" -o "$tmpdir/in.fifo" Jobs
 
        if  [[ $newusers = true ]] ; then 
-  	     echo "echo Newusers; IFS=$'\t' read -r -s -a userlist" | empty -c -s -o $tmpdir/in.fifo
-  	     empty -w -i $tmpdir/out.fifo -o $tmpdir/in.fifo Newusers
+  	     echo "echo Newusers; IFS=$'\t' read -r -s -a userlist" | empty -c -s -o "$tmpdir/in.fifo"
+  	     empty -w -i "$tmpdir/out.fifo" -o "$tmpdir/in.fifo" Newusers
 	     if (( $? == 1 )) ; then
-	         printf "%s\t" "${userlist[@]}" | empty -s -o $tmpdir/in.fifo 
-	         printf "\n" | empty -s -o $tmpdir/in.fifo 
+	         printf "%s\t" "${userlist[@]}" | empty -s -o "$tmpdir/in.fifo" 
+	         printf "\n" | empty -s -o "$tmpdir/in.fifo" 
 	     else
 	         echo "unexpected response from empty, return code $?"
 	         exit 1
@@ -541,12 +541,12 @@ for server in ${servers[@]} ; do
 
   	#Run final enabled commands
   	if (( ${#runjobs[@]} != 0 )) ; then
-      	    joblist=(${runjobs[@]})
+      	    joblist=("${runjobs[@]}")
         fi
         for job in "${joblist[@]}" ; do 
       	    if [[ -r "$(readlink -e $job)" ]] ; then
-	         empty -s -o $tmpdir/in.fifo "printf '%s\n' '### Running job ###$job###'\n"
-	         empty -s -c -o $tmpdir/in.fifo <"$job"
+	         empty -s -o "$tmpdir/in.fifo" "printf '%s\n' '### Running job ###$job###'\n"
+	         empty -s -c -o "$tmpdir/in.fifo" <"$job"
             else
                  echo "### unable to read $job"
 	         exit 1
@@ -555,10 +555,10 @@ for server in ${servers[@]} ; do
   fi
 
   #wait for last keyword
-  empty -s -o $tmpdir/in.fifo "echo '##End##'\n"
-  empty -w -t 3600 -i $tmpdir/out.fifo -o $tmpdir/in.fifo End
+  empty -s -o "$tmpdir/in.fifo" "echo '##End##'\n"
+  empty -w -t 3600 -i "$tmpdir/out.fifo" -o "$tmpdir/in.fifo" End
   #close session
-  empty -s -o $tmpdir/in.fifo "exit\n"
+  empty -s -o "$tmpdir/in.fifo" "exit\n"
 
   { cleanup; wait ;} 2>/dev/null
 done
