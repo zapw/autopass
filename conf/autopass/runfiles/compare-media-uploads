@@ -1,0 +1,13 @@
+for site in spotplatform.fx77.com woojoo-trader.com spotplatform.woojoo-trader.com \
+        gttraders.com spotplatform.gttraders.com cwgoption.com spotplatform.cwgoption.com \
+        spotplatform.cfoption88.com spotplatform.webitrader.com webitrader.com ; do
+	
+     if [[ $site == spotplatform.* ]] ; then 
+         echo "<<<  $site   <<<"
+         find "/mnt/nfs/data/$site/media/" -print0 | sort -nz | md5sum
+     else
+         echo "<<<  $site   <<<"
+         find "/mnt/nfs/data/$site/uploads/" -print0 | sort -nz | md5sum
+     fi
+         
+done

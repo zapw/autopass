@@ -1,0 +1,54 @@
+#%sudousers ALL=(ALL)    ALL
+#http://awk.freeshell.org/Frequently_Asked_Questions#toc1 -- How do I print a range of fields, e.g. from field 2 to the end?
+PATH=$PATH:/sbin:/bin:/usr/sbin:/usr/bin:/usr/local/bin:/usr/local/sbin
+
+shopt -s extglob dotglob
+while read -r group ; do [[ $group = @(ssh*|sudo*) ]] && groups+=($group) ; done < <(sudo awk \
+	'BEGIN { OFS = "\n" } /^AllowGroups/ { $1=""; print } /^%sudousers/ { sub(/%/,"") ; print $1 }' \
+	 /etc/ssh/sshd_config /etc/sudoers)
+
+if (( ! ${#userlist[@]}  )) ; then
+     echo 'userlist array is empty! make sure newusers=true in autopass config file.'
+else
+
+     printf "%s\n" "${userlist[@]}" | newusers
+
+     for username in "${userlist[@]}"; do
+          IFS=: read user password uid gid gecos dir shell <<<"$username"
+          sudo -u $user cp -a /etc/skel/* "$dir/"
+          if (( ${#groups[@]} )) ; then
+             sIFS="$IFS"
+	     IFS=,; usermod -G "${groups[*]}" "$user"
+	     IFS="$sIFS"
+          fi
+
+          if ! egrep -q -r '^AllowUsers.*[[:space:]]+'"$user"'([[:space:]]+|$).*' /etc/ssh/sshd_config && \
+     	 ! egrep -q -r '^AllowGroups' /etc/ssh/sshd_config && egrep -q -r \
+     		'^AllowUsers' /etc/ssh/sshd_config; then
+              cp -a /etc/ssh/sshd_config  /etc/ssh/sshd_config.new
+              echo "AllowUsers $user" >> /etc/ssh/sshd_config.new
+              /usr/sbin/sshd -t -f /etc/ssh/sshd_config.new && mv -f /etc/ssh/sshd_config.new /etc/ssh/sshd_config
+          fi
+
+          while [[ -f /etc/sudoers.tmp ]] ; do
+                sleep 1
+          done
+
+          #if user isn't allowed to sudo
+          if ! sudo -u "$user" /bin/bash -c "printf '%s\n' $password | sudo -S -v"; then
+             #set lockfile
+             touch /etc/sudoers.tmp
+             cp -a /etc/sudoers{,.new}
+             echo "$user"$'\tALL=(ALL)\tNOPASSWD: ALL' >>/etc/sudoers.new && \
+     		visudo -c -f /etc/sudoers.new && mv -f /etc/sudoers{.new,}
+             rm -f /etc/sudoers.tmp
+          fi
+
+          #force change of password
+          #chage -d 0 "$user"
+     done
+     shopt -u extglob dotglob
+
+     service sshd reload
+
+fi

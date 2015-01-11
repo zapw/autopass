@@ -1,0 +1,3 @@
+if ! grep -q LogFormat /etc/httpd/conf/httpd.conf ; then
+   printf "%s\n" '# CustomLog with format nickname' 'LogFormat "%h %l %u %t \"%r\" %>s %b" common' >>/etc/httpd/conf/httpd.conf && service httpd graceful
+fi

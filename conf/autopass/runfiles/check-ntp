@@ -1,0 +1,7 @@
+echo $HOSTNAME
+if ! ntpstat ; then 
+   service ntpdate start
+   service ntpd start
+   chkconfig ntpdate on
+   chkconfig ntpd on
+fi

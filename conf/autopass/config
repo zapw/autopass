@@ -1,0 +1,4 @@
+#repliweblic=/mnt/
+repliweblic=./licenses/
+repliwebinstall=false
+newusers=false

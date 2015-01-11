@@ -1,0 +1,4 @@
+add job to only update licenses from directory
+http://www.cons.org/cracauer/sigint.html
+add ControlMaster=yes and use rsync to transfer files via opened ssh connection
+use tmux,screen to open multiplie connections at once and have them tabbed on screen

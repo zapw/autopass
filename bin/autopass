@@ -1,0 +1,562 @@
+#!/bin/bash
+#the script uses 'empty' http://empty.sourceforge.net/
+
+conntimeo=30
+repliweblic="/mnt/"
+confdir="/usr/local/etc/autopass"
+runfilesdir="$confdir/runfiles"
+enableddir="$confdir/enabled"
+repliwebinstall=true
+newusers=false
+tmpdir="$(mktemp -d)" || exit 1
+
+. $confdir/config
+
+usage() {
+cat <<EOF
+Usage:
+ autopass -l
+ autopass -l -e|-le
+ autopass [[-j jobname] [...]] [[-s server] [...]] [-f file.log] [-v] [-q]
+ autopass -e [[prio] jobname ...] [...]
+ autopass -d jobname|number ... 
+ autopass -p name|number ...
+ autopass -a jobname
+ autopass -h
+Options:
+  -l        List available jobs
+  -le       List enabled jobs
+  -j        Run job or multiplie jobs -j jobname1 -j jobname2 ...
+  -s        Connect to specific server or servers -s server1 -s server2 ...
+  -v        verbose mode, echo input
+  -q        quiet mode, don't print session to stdout
+  -e        Enable and append new jobs by decreasing priority or by a prio number
+  -f        file.log This option allows to log the whole session
+  -d        Delete enabled job by its name or number 
+  -p        Print job by its name
+  -a        Create a new or edit an exisitng or new job
+  -h        Print this usage
+EOF
+exit 1
+}
+
+liflg=0
+enflg=0
+deflg=0
+prflg=0
+ejflg=0
+jnflg=0
+srflg=0
+loflg=0
+stflg=0
+defaultargs=([0]="-z" [1]="-O")
+
+declare -A password
+getpass() {
+ while IFS= read -s -p "Password$1: " -e -r password[password$1] && [[ -z "${password[password$1]}" ]] ; do 
+  printf "\n"
+ done
+ printf "\n"
+}
+
+inarray() {
+ local n=$1 h
+ shift
+ for h; do 
+   [[ $n = "$h" ]] && return
+ done
+ return 1
+}
+
+install_pkg () {
+  local package pkg
+  for package; do
+      [[ ! -x $package ]] && pkg+=($package)
+  done
+  if ((${#pkg[@]})) ; then
+       echo Installing missing binaries: "${pkg[@]}"
+       [[ -f /etc/redhat-release ]] && sudo yum install -y  ${pkg[@]##*/}
+       [[ -f /etc/debian_version ]] && sudo apt-get install ${pkg[@]##*/}
+  fi
+}
+
+OPTIND=1
+while getopts "s:j:f:lqedpahv" opt; do
+    case "$opt" in
+        h)
+            usage
+            ;;
+        l)
+            liflg=1
+            ;;
+        j)
+            jnflg=1
+            runjobs+=("$runfilesdir/$OPTARG")
+            ;;
+        s)
+            srflg=1
+            servers+=("$OPTARG")
+            ;;
+        f)
+            loflg=1
+            logparam=("-L" "$OPTARG")
+            ;;
+        e)
+            enflg=1
+            ;;
+        v)
+	    unset defaultargs[0]
+            ;;
+        q)
+	    stflg=1
+	    unset defaultargs[1]
+            ;;
+        d)
+            deflg=1
+            (($# < 2)) && usage
+            ;;
+        p)
+            prflg=1
+            (($# < 2)) && usage
+            ;;
+        a)
+            ejflg=1
+            (($# < 2)) && usage
+            ;;
+      '?')
+            usage
+            exit 1
+            ;;
+    esac
+done
+
+shift "$((OPTIND-1))"
+
+#switches are not allowed to be combined, except srgflg with jnflg
+srorjnflg=$(( srflg || jnflg ))
+enorliflg=$(( enflg || liflg ))
+x=$(( enorliflg + deflg + prflg + ejflg + srorjnflg ))
+(( (x * x) != x )) &&  usage
+
+if (( liflg && ! enflg )) ; then
+    echo "$runfilesdir/":
+    for list in "$runfilesdir/"* ; do 
+        ((++i)) 
+        echo "$i)${list##*/}"
+    done
+    exit 0
+fi
+
+if (( ( enflg + liflg ) == 2 )) ; then
+    echo "$enableddir/":
+    shopt -s nullglob
+    listen=("$enableddir/"*)
+    for list in "${listen[@]}" ; do 
+        ((++i)) 
+        echo "$i)${list##*/}"
+    done
+    exit 0
+fi
+if (( enflg )) ; then
+    (( $# )) || usage
+    shopt -s extglob
+    shopt -s nullglob
+
+    #this will return 'fullpath/*' if there are no enabled jobs
+    linkorder=("$enableddir/"*) 
+    for arg ; do 
+        #check first argument for priority, if none push job to last from the list
+        if (( ! ${#prio[@]} )) && [[ $arg != +([[:digit:]]) ]] ; then
+            if [[ -z $ordernum ]] ; then
+                #check last enabled jobs
+		if [[ ${linkorder[@]} ]] ; then
+		    total="${#linkorder[@]}"
+                    ordernum="${linkorder[total-1]##*/}"
+
+                    #strip all characters from job name expect its digits
+                    ordernum="${ordernum%%[![:digit:]]*}"
+                    printf -v ordernum "%03d" "$((10#$ordernum + 1))"
+
+                else  
+		    printf -v ordernum "%03d" "1"
+                fi
+            fi
+            [[ ! -r "$runfilesdir/$arg" ]] && { echo unable to read "$runfilesdir/$arg" ; exit 1 ;}
+            if ln -sf "../${runfilesdir##*/}/$arg" "$enableddir/${ordernum}$arg" ; then
+		echo enabled "$enableddir/${ordernum}$arg"
+	    else
+		echo error, "$enableddir/${ordernum}$arg" not enabled
+	    fi
+            #convert number to base 10 (discards the leading zeros)
+            printf -v ordernum "%03d" "$((10#$ordernum + 1))"
+
+        elif [[ $arg = +([[:digit:]]) ]] ; then
+              [[ $lookforprio = "true" ]] && unset prio
+              prio+="$(printf "%03d" "$arg")"
+        else
+              lookforprio=true
+              for p in "${prio[@]}" ; do
+                  if ln -sf "../${runfilesdir##*/}/$arg" "$enableddir/${prio}$arg" ; then
+	              echo enabled "$enableddir/${prio}$arg"
+		  else
+		      echo error, "$enableddir/${prio}$arg" not enabled
+	     	  fi
+              done
+        fi
+    done
+    exit 0
+fi
+
+if (( deflg )) ; then
+    echo "$enableddir/":
+    while (( $# )) ; do
+           if [[ $1 = +([[:digit:]]) ]] ; then
+		       bynum+=("$1")
+	       else
+		       byname+=("$1")
+	       fi
+           shift
+    done
+    
+    if (( ${#bynum[@]} )); then
+        shopt -s nullglob
+        enlist=("$enableddir/"*)
+	    set -- "${bynum[@]}"
+        while (( $# )) ; do
+               i=0
+               for list in "${enlist[@]}" ; do 
+                    (( ++i ))
+                    (( i > $1 )) && { shift; break ;}
+	                for (( y=1; y<=$#; y++ )) ; do
+                         #delte job if parameter matches job number
+                         if (( $1 == i )) ; then
+	                         rm "$list" && { echo deleted "$list" ;}
+                             unset 'bynum[y-1]'
+                             bynum=("${bynum[@]}")
+	                     break 2
+                         fi
+	                done
+               done
+               shift
+        done
+    fi
+
+    if (( ${#byname[@]} )); then
+        for job in "${byname[@]/#/$enableddir/}"; do
+	        rm "$job" && { echo deleted "$job" ;}
+        done
+    fi
+
+    #if there are still jobs in bynum array it means they weren't found/matched
+    for element in "${bynum[@]}" ; do
+   	    echo "job number $element not found"
+    done
+
+    exit 0
+fi
+	    
+if (( ! ${#servers[@]} )) && [[ -f "$confdir/servers" ]] ; then
+     mapfile -t servers <$confdir/servers
+
+ elif (( ! ${#servers[@]} )) ; then
+    { echo -e "server list missing in $confdir/servers\n via command line: ${0##*/} [-s servername1] [...]"; exit 1 ;}
+fi
+
+if (( ${#runjobs[@]} != 0 )) ; then
+    for job in "${runjobs[@]}" ; do 
+        [[ ! -r $job ]] && { echo Error reading job at $job ; exit 1 ;}
+    done
+fi
+
+if [[ $repliwebinstall = true ]] ; then
+     [[ ! -f "$confdir/repliweb/setup" ]] && { echo $confdir/repliweb/setup file not found; exit 1 ;}
+     install_pkg /usr/bin/dos2unix /sbin/mount.cifs
+fi
+
+if [[ $newusers = true ]] ; then
+     [[ ! -f "$confdir/newusers" ]] && { echo $confdir/newusers not found; exit 1 ;}
+     while read -r list ; do 
+	    [[ $list =~ ^(#|$) ]] && continue 
+	    userlist+=("$list") 
+     done <$confdir/newusers
+     if (( ! "${#userlist[@]}" )) ; then 
+	      echo "no users found in $confdir/newusers"
+	      exit 1
+     fi
+fi
+
+
+read -p "Username: " -e -r user
+
+getpass
+getpass 1
+
+(( ! ${#password[@]} )) && exit 1
+: ${user:=$USER}
+
+cleanup() {
+      local pid
+      if [[ -r $tmpdir/empty.pid ]] ; then
+          read -r pid <$tmpdir/empty.pid
+          kill $pid &>/dev/null
+          while kill -0 $pid &>/dev/null; do sleep 0.5 ; done
+      fi
+
+      kill -0 $emptyproc &>/dev/null && kill $emptyproc &>/dev/null
+      while kill -0 $emptyproc &>/dev/null ; do 
+           sleep 0.5
+      done
+      rm $tmpdir/{in,out}.fifo $tmpdir/empty.pid 2>/dev/null
+
+      [[ -f "$repliweblicfile" ]] && rm "$repliweblicfile"
+      [[ $1 = all ]] && rm -rf "$tmpdir"
+}
+
+trap "cleanup all" EXIT
+
+getsudo() {
+  local returnval
+  echo "read -r -s -p Getsudo$'\n' -a sudopass" | empty -s -o $tmpdir/in.fifo
+  empty -w -i $tmpdir/out.fifo -o $tmpdir/in.fifo Getsudo
+  returnval=$?
+
+  if (( returnval == 1 )) ; then
+      echo "${password[@]}" | empty -s -o $tmpdir/in.fifo 
+
+      empty -w -i $tmpdir/out.fifo -o $tmpdir/in.fifo '_prompt_'
+      echo 'printf "%s\n" "${sudopass[@]}" | sudo -S -v' | empty -s -o $tmpdir/in.fifo
+
+      empty -w -i $tmpdir/out.fifo -o $tmpdir/in.fifo 'incorrect password attempts' '' 'may not run sudo on' '' '_prompt_' ''	
+      returnval=$?
+
+      if (( returnval == 1 )) ; then
+          echo unable to sudo bad passwords
+	  { cleanup; wait ;} 2>/dev/null
+          continue
+
+      elif (( returnval == 2 )) ; then
+          echo user not allowed to run sudo
+	  { cleanup; wait ;} 2>/dev/null
+          continue
+
+      elif (( returnval == 3 )) ; then
+            #refresh our sudo cache every few minutes, in the background
+            empty -s -o $tmpdir/in.fifo 'while kill -0 $PPID ; do sleep 120; sudo -v; done &\n'
+            echo "unset sudopass" | empty -s -o $tmpdir/in.fifo 
+      else
+           echo unable to match keyphrase to sudo prompt
+           exit 1
+      fi
+
+  elif (( returnval == 255 )) ; then
+       echo unable to match keyphrase to sudo prompt
+       exit 1
+  else
+       echo unknown return code from empty
+       exit 1
+  fi
+}
+
+exit_noninteractiveshell () {
+  empty -w -t 60 -i $tmpdir/out.fifo -o $tmpdir/in.fifo "done" "exit\n"
+  empty -s -o $tmpdir/in.fifo "echo\n"
+  empty -s -o $tmpdir/in.fifo "echo\n"
+  empty -w -t 500 -i $tmpdir/out.fifo -o $tmpdir/in.fifo "_prompt_"
+}
+
+repliwebinst() {
+  local component
+  
+  empty -s -o $tmpdir/in.fifo "cat | sudo /bin/bash\n"
+  empty -s -o $tmpdir/in.fifo "printf '\n%s\n' '###begin##repliweb###'\n"
+  empty -w -i $tmpdir/out.fifo -o $tmpdir/in.fifo '###begin##repliweb###'
+  empty -s -o $tmpdir/in.fifo "echo Host is \$HOSTNAME\n"
+  empty -w -i $tmpdir/out.fifo -o $tmpdir/in.fifo 'web1($|\.)' '' '.*' ''
+
+  returnval=$?
+  [[ $returnval = 1 ]] && component=(center)
+  [[ $returnval = 2 ]] && component=(edge)
+
+  echo -e "Configuring as ${component[@]^*}\n"
+
+  empty -s -o $tmpdir/in.fifo <"$confdir/repliweb/setup"
+
+  exit_noninteractiveshell
+
+  empty -s -o $tmpdir/in.fifo "pushd \$HOME/repliweb/\n"
+  empty -s -o $tmpdir/in.fifo "sudo ./install\n"
+
+  empty -w -t 30 -i $tmpdir/out.fifo -o $tmpdir/in.fifo "press any other key." "\n"
+  empty -w -i $tmpdir/out.fifo -o $tmpdir/in.fifo "installation directory" "\n"
+  empty -w -i $tmpdir/out.fifo -o $tmpdir/in.fifo "path has write permissions" "\n"
+  empty -w -i $tmpdir/out.fifo -o $tmpdir/in.fifo "perform a standard installation" "n\n"
+  empty -w -i $tmpdir/out.fifo -o $tmpdir/in.fifo "Console[[:space:]]+y/n" "n\n"
+  if inarray "center" "${component[@]}" ; then
+	   empty -w -i $tmpdir/out.fifo -o $tmpdir/in.fifo "Center[[:space:]]+y/n" "y\n"
+	   empty -w -i $tmpdir/out.fifo -o $tmpdir/in.fifo "Edge[[:space:]]+y/n" "n\n"
+  elif inarray "edge" "${component[@]}" ; then  
+	   empty -w -i $tmpdir/out.fifo -o $tmpdir/in.fifo "Center[[:space:]]+y/n" "n\n"
+	   empty -w -i $tmpdir/out.fifo -o $tmpdir/in.fifo "Edge[[:space:]]+y/n" "y\n"
+  fi
+  empty -w -t 120 -i $tmpdir/out.fifo -o $tmpdir/in.fifo "email notification" "n\n" ".*" "" 
+
+  [[ $? = 255 ]] && { echo aborting; exit 1 ;}
+
+  #wait for repliweb installation to finish.
+  empty -w -t 3600 -i $tmpdir/out.fifo -o $tmpdir/in.fifo "_prompt_"
+
+  #copy license
+  empty -s -o $tmpdir/in.fifo "sudo sh -c 'cat >/usr/repliweb/rds/license/lic_repliweb.rw' <<EOF\n"
+  cat <"$repliweblicfile" | empty -s -o $tmpdir/in.fifo
+  empty -s -o $tmpdir/in.fifo "EOF\n"
+  empty -s -o $tmpdir/in.fifo "sudo cp /usr/repliweb/rds/license/lic_repliweb.rw /usr/repliweb/r1/license/lic_repliweb.rw\n"
+}
+
+tail_pid () {
+  local pid
+  read -r pid <$tmpdir/empty.pid || { echo failed to read 'empty' pid; exit 1; }
+  #check if empty is alive
+  kill -0 "$pid" 2>/dev/null || exit 1 
+}
+
+#iterate through the servers list
+for server in ${servers[@]} ; do
+  if [[ $repliwebinstall = true ]] ; then
+       repliweblicfile=($repliweblic/*${server%.prod*}/lic_repliweb.rw)
+       if [[ ! -f "$repliweblicfile" ]] ; then
+           echo "can't find repliweb lic_repliweb.rw for ${server%.prod*} in $repliweblic"
+           exit 1
+       fi
+       if cp "$repliweblicfile" /tmp/${server%.prod*}-lic_repliweb.rw && dos2unix /tmp/${server%.prod*}-lic_repliweb.rw ; then
+           repliweblicfile=/tmp/${server%.prod*}-lic_repliweb.rw
+       else
+           exit 1
+       fi
+  fi
+
+  #connect to the server
+  if (( $stflg != 1 )) ; then
+      banner="connecting to server"
+      bannerlength=$((${#banner} + 1))
+      serverlength="${#server}"
+      printf "\n\n%s\n%${bannerlength}s" "$banner $server" " "
+      printf "%${serverlength}s" " " | tr " " "*"
+  fi
+
+  export SSH_AGENT_PID=$SSH_AGENT_PID SSH_AUTH_SOCK=$SSH_AUTH_SOCK
+  empty -f -i $tmpdir/in.fifo -o $tmpdir/out.fifo -p $tmpdir/empty.pid "${defaultargs[@]}" "${logparam[@]}" \
+	ssh -o ConnectTimeout="$conntimeo" -t -o stricthostkeychecking=no $user@$server "PS1='_prompt_ ' /bin/bash --norc" || exit 1
+	tail_pid
+
+  #check if succesfully logged or if we got a password prompt
+  empty -w -t "$conntimeo" -i $tmpdir/out.fifo -o $tmpdir/in.fifo '_prompt_' '' assword '' 'Enter passphrase for key' '' &
+  emptyproc=$!
+
+  i="$conntimeo"
+  printf "\n"
+  exec 3>&2
+  while kill -0 "$emptyproc" 2>/dev/null; do
+       (( i < ($conntimeo - 1) )) &&  printf "%s\r"  "timeout in ${i}s press 's' to skip" >&3
+       ((i--))
+       sleep 1
+  done &
+  exec 3>&-
+
+  while kill -0 "$emptyproc" 2>/dev/null && [[ $skip != s ]] ; do read -N1 -s -t 1 skip  ; done
+  if [[ $skip == s ]] ; then
+      unset skip
+      { cleanup; wait ;} 2>/dev/null
+      continue
+  fi
+
+  wait "$emptyproc"
+
+  # = 2 return code from empty (second pair) means we got a password prompt, = 3 means either private key wasn't saved to ssh-agent or host dosen't have our pubkey.
+  returnval=$?
+  if (( returnval == 3 )) ; then
+       #fall back to password authentication
+       empty -s -o $tmpdir/in.fifo "\n"
+
+       empty -w -i $tmpdir/out.fifo -o $tmpdir/in.fifo '_prompt_' '' assword
+       returnval=$?
+  fi
+  
+  if (( returnval == 2 )) ; then
+      echo "${password[password]}" | empty -s -o $tmpdir/in.fifo 
+      #recheck for login status
+      empty -w -i $tmpdir/out.fifo -o $tmpdir/in.fifo '_prompt_' '' assword
+
+      returnval=$?
+      if (( returnval == 2 )) ; then
+          #try second password
+          echo "${password[password1]}" | empty -s -o $tmpdir/in.fifo 
+          #recheck for login status
+          empty -w -i $tmpdir/out.fifo -o $tmpdir/in.fifo '_prompt_' '' assword
+
+          returnval=$?
+	  #both passwords failed.
+          if (( returnval == 2 )) ; then
+              echo "Failed to authenticate, bad passwords/username"
+              { cleanup; wait; } 2>/dev/null
+              continue
+	  #we are in using second password
+          elif (( returnval != 1 )) ; then
+		echo unknown response
+                exit 1
+	  fi
+      fi
+  # = 1 return code we are in without password prompt
+  elif (( returnval != 1 )) ; then
+        echo -e "\nUnable to connect to $server\n"
+        { cleanup; wait;} 2>/dev/null
+	continue
+  fi
+
+  getsudo
+  [[ $repliwebinstall = true ]] && repliwebinst 
+
+  shopt -s nullglob
+  joblist=("$enableddir/"*)
+  shopt -u nullglob
+  if (( ${#joblist[@]} || ${#runjobs[@]} )) ; then
+       empty -s -o $tmpdir/in.fifo "cat | sudo /bin/bash\n"
+       empty -s -o $tmpdir/in.fifo "echo -e '\n###Starting Jobs###'\n"
+       #Wait for the keyword, until remote terminal is ready to receive more input commands.
+       empty -w -t 3600 -i $tmpdir/out.fifo -o $tmpdir/in.fifo Jobs
+
+       if  [[ $newusers = true ]] ; then 
+  	     echo "echo Newusers; IFS=$'\t' read -r -s -a userlist" | empty -c -s -o $tmpdir/in.fifo
+  	     empty -w -i $tmpdir/out.fifo -o $tmpdir/in.fifo Newusers
+	     if (( $? == 1 )) ; then
+	         printf "%s\t" "${userlist[@]}" | empty -s -o $tmpdir/in.fifo 
+	         printf "\n" | empty -s -o $tmpdir/in.fifo 
+	     else
+	         echo "unexpected response from empty, return code $?"
+	         exit 1
+   	     fi
+        fi
+
+  	#Run final enabled commands
+  	if (( ${#runjobs[@]} != 0 )) ; then
+      	    joblist=(${runjobs[@]})
+        fi
+        for job in "${joblist[@]}" ; do 
+      	    if [[ -r "$(readlink -e $job)" ]] ; then
+	         empty -s -o $tmpdir/in.fifo "printf '%s\n' '### Running job ###$job###'\n"
+	         empty -s -c -o $tmpdir/in.fifo <"$job"
+            else
+                 echo "### unable to read $job"
+	         exit 1
+            fi
+        done
+  fi
+
+  #wait for last keyword
+  empty -s -o $tmpdir/in.fifo "echo '##End##'\n"
+  empty -w -t 3600 -i $tmpdir/out.fifo -o $tmpdir/in.fifo End
+  #close session
+  empty -s -o $tmpdir/in.fifo "exit\n"
+
+  { cleanup; wait ;} 2>/dev/null
+done
+printf "\n"

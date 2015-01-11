@@ -1,0 +1,4 @@
+#       pw_name:pw_passwd:pw_uid:pw_gid:pw_gecos:pw_dir:pw_shell
+#       man newusers(8)
+
+#foobar1:Password1:::Foobar User1:/home/foobar1:/bin/bash

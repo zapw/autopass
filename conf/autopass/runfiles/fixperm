@@ -1,0 +1,3 @@
+#sudo chown -R framework.framework /home/framework/domains/crm.spotoption.com/public_html
+#sudo chown porterfinc.access /home/porterfinc/domains/spotplatform.porterfinance.com/templates/compiled
+chown -R spdsupport.spdsupport /home/spdsupport

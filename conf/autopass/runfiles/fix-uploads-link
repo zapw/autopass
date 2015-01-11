@@ -1,0 +1,10 @@
+shopt -s extglob
+if cd /mnt/nfs/data/ ; then
+   for link in !(spotplatform.*) ; do
+       if [[ ! -d "/mnt/nfs/data/$link/uploads" ]] ; then
+           echo dir "/mnt/nfs/data/$link/uploads missing, please upload content of wp uploads dir"
+           mkdir -p "/mnt/nfs/data/$link/uploads"
+       fi
+       ln -s "/mnt/nfs/data/$link/uploads" "/data/spotoption/$link/wp-content/uploads"
+   done
+fi

@@ -1,0 +1,4 @@
+sudo yum install -y ed
+printf '%s\n' '/spotagent.sh/s/;.\+//' 'w' '.' 'q' | sudo ed -s /etc/crontab
+sudo chmod +x /root/scripts/geoipfiles
+sudo mv /root/scripts/geoipfiles /etc/cron.weekly/

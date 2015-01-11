@@ -1,0 +1,4 @@
+printf "PHP ver on server %s\n" "$HOSTNAME: $(php -v 2>/dev/null | awk  '/PHP 5./{print $2; exit}')"
+echo PHP Modules:
+php -m |egrep  '(memc|intl)'
+echo ------------------------
