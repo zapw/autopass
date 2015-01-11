@@ -1,0 +1,6 @@
+#url="http://garr.dl.sourceforge.net/project/phpmyadmin/phpMyAdmin/4.3.11/phpMyAdmin-4.3.11-english.tar.xz"
+url="http://hivelocity.dl.sourceforge.net/project/phpmyadmin/phpMyAdmin/3.5.7/phpMyAdmin-3.5.7-all-languages.tar.xz"
+dstdir="/var/www/html"
+phpdir_name="phpMyAdmin"
+passwd_dir="/etc/httpd/conf/passwd"
+passwd_file="passwd.admin"

@@ -1,0 +1,2 @@
+declare -A hosts
+keys=("")

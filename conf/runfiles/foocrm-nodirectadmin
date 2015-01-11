@@ -1,0 +1,17 @@
+if [[ -x /usr/local/directadmin/directadmin || -x /etc/init.d/directadmin  ]] ; then 
+    echo 'skipping job /usr/local/directadmin/directadmin or /etc/init.d/directadmin exists'
+else
+    [[ ! -x /bin/ed ]] && sudo yum install -y ed
+
+    php -m | grep -q intl || rpm -qf /usr/bin/php | while read -r package  ; do yum install -y "${package%%-*}-intl" ; done
+
+    #printf '%s\n' '/^Alias \/crm/d' 'w' | sudo ed -s /etc/httpd/conf.d/alias.conf
+    grep -q '^Alias /crm' /etc/httpd/conf.d/alias.conf ||  printf '%s\n' '$a' 'Alias /crm /data/crm/public_html/public' . w | \
+      sudo ed -s /etc/httpd/conf.d/alias.conf
+
+    grep -q -E AllowOverride.+Options /etc/httpd/conf.d/dir.conf || printf '%s\n' '/AllowOverride /s/$/ Options/' w | sudo ed -s /etc/httpd/conf.d/dir.conf
+
+    [[ ! -d /data/crm ]] && mkdir /data/crm && chmod 755 /data/crm
+
+    sudo service httpd graceful
+fi

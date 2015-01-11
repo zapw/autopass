@@ -1,0 +1,11 @@
+for site in  foobar ; do
+	
+     if [[ $site == foobarx.* ]] ; then 
+         echo "<<<  $site   <<<"
+         find "/mnt/nfs/data/$site/media/" -print0 | sort -nz | md5sum
+     else
+         echo "<<<  $site   <<<"
+         find "/mnt/nfs/data/$site/uploads/" -print0 | sort -nz | md5sum
+     fi
+         
+done

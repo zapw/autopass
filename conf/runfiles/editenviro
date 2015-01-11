@@ -1,0 +1,12 @@
+#!/bin/bash
+if grep "^export ENVIRONMENT=" /etc/sysconfig/httpd ; then
+    printf "%s\n" "g/^export ENVIRONMENT=/" 's/\(ENVIRONMENT=\).*/\1"XXWL"/' w | ed -s /etc/sysconfig/httpd
+else
+    echo 'export ENVIRONMENT="XXWL"' >>/etc/sysconfig/httpd
+fi
+
+printf '%s\n' 'g/^ENV=/ s/^#\?/#' w | ed -s /etc/init.d/httpd
+
+
+service httpd restart
+service directadmin reload

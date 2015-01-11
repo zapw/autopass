@@ -1,0 +1,3 @@
+#cp /etc/php.ini /etc/php.ini.crm.working
+#cp /etc/php.ini.bak /etc/php.ini
+service httpd restart

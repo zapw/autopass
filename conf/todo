@@ -1,0 +1,56 @@
+update empty terminal emulator code to handle SIGWINCH and update COLUMNS value 
+http://www.cons.org/cracauer/sigint.html
+see reverse/forward Proxy in ssh maybe use shell redirect to tcp port or socat to rediect tcp to stdin from rsync -server  run it localy then as root rsync client from remote
+http://serverfault.com/questions/565083/rsync-over-active-ssh-connection
+
+print list of servers in lines aligns columns rows that script is going to connect before connecting:
+http://wiki.bash-hackers.org/snipplets/print_horizontal_line
+use FMT ! fmt 
+
+put it inside ( &)  to get rid of job control message 
+ test locally timestamp_timeout  in /etc/sudo.conf or sudoers test with sudo -v on the subshell ( &) 
+ test locally timestamp_timeout  in /etc/sudo.conf or sudoers test with sudo -v if sudo caching is disabled sudo -v is useless 
+make sure all background proccesses are killed before living the box including ones executed via #! she bang
+DEBUG and ERR traps. You want set -T and/or extdebug for those cases. are inherented by child subshells read extdebug
+
+
+move jobs to their own directories and add file depends , so that each "cookbook" depends on appropiate one
+add file depends , so that each "cookbook" depends on appropiate cookbooks loads all attributes from the cookbooks it depends on by order in the depends list
+
+see how to include multiplie cookbooks into one custom and have values from this named cookbook override all other values from included cookbooks in case they conflict
+
+see lsof error is giving in newrelic_mysql sql4. use  -F suitable output for awk per ...
+
+re-evaluate nameref (   grep -R '{!' * )  see if it executes arbitrary code in the scripts
+
+set up pipe logging for apache
+
+fix so that ------j  will print unrecognized option more than 2 --   will print error see why it isn't happening.
+
+save output from runlist to associative array print output of failed recipe/job in case a recipe/job failed
+in -v mode print output from runlist with -vv also print input sent to remote
+
+fix devuser recipe web1 extglob get from var
+
+use tput to draw the servers list instead of playing with printf
+terminfo(5) 
+ANSI X3.64 is a terminal control code standard supported by most modern terminals. VT100 is a subset implemented by DEC's VT100/102. DO NOT hardcode codes, use tput(1) instead (eg. red=$(tput setaf 1)). Many different terminals use slightly different codes, tput finds the right code for the job. http://unix.stackexchange.com/a/5802 http://wiki.bash-hackers.org/scripting/terminalcodes
+
+
+10:34:01 PM) greycat: Fine.  See if   tput cup 99 0; tput el    is close to what you want.  If it's not, tell us how it need to be changed.
+(10:34:32 PM) greycat: Remember that you need to do this from some sort of script that doesn't terminate and draw a new prompt, or you won't be able to tell that it worked.
+(10:35:36 PM) AndroidLoverInSF left the room (quit: Ping timeout: 272 seconds).
+(10:36:11 PM) greycat: (Alternative: do it from a *different* terminal, with stdout redirected to the terminal you want to operate on.)
+
+
+depends line should load all atrributes from the cookbook it depends
+starting with the default.* if it exists in the depandant cookbook
+create depends function that takes argument and fills array with info or so...
+
+fix mod_security use from web2.p11.us
+
+use bind mounts instead of symlink to fix uploads in wordpress master
+devuser should have like sshfsuser only sftp access move both users creations to adduser script
+
+see what mod_security is doing phpmyadmin.conf
+

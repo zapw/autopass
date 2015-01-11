@@ -1,0 +1,3 @@
+echo $HOSTNAME; netstat -aupnt | grep -E "5745|2837"
+echo --------------------
+

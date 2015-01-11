@@ -1,0 +1,35 @@
+[[ $HOSTNAME = web1.* ]] || [[ $HOSTNAME = "web1" ]] &&  enviro=qa || enviro=production
+
+[[ ! -x /bin/ed ]] && sudo yum install -y ed
+printf '%s\n' '/open_basedir =/s/^;*/;/' w | sudo ed -s /usr/local/lib/php.ini
+
+if grep -q ^#Custom /etc/sysconfig/httpd 2>/dev/null ; then
+   printf "%s\n" "/^#Custom/,/#EndCustom/c" "#Custom" "export SYS_PATH=/home/framework/foobarSys" "export APPLICATION_ENV=$enviro" \
+         "export ZF2_PATH=/home/framework/domains/xxx.foobarcom.com/public_html" "#EndCustom" "." "w" | sudo ed -s /etc/sysconfig/httpd
+else
+  sudo /bin/bash -c 'printf "%s\n" "#Custom" "export SYS_PATH=/home/framework/foobarSys" "export APPLICATION_ENV='$enviro'" \
+        "export ZF2_PATH=/home/framework/domains/xxx.foobarcom.com/public_html" "#EndCustom" >>/etc/sysconfig/httpd'
+fi
+
+if ! grep -q "/etc/sysconfig/httpd" /etc/init.d/httpd ; then
+	sudo ed -s /etc/init.d/httpd <<EOF
+/\. \/etc\/rc.d\/init.d\/functions/
++1
+a
+if [ -f /etc/sysconfig/httpd ]; then
+    . /etc/sysconfig/httpd
+fi
+.
+w
+EOF
+fi
+
+printf '%s\n' '/^ENV=/' 's/ APPLICATION_ENV=[[:alnum:]]*//' "s/\"\$/ APPLICATION_ENV=$enviro\"/" w | sudo ed -s /etc/init.d/httpd
+
+grep -q '^Alias /xxx' /etc/httpd/conf/extra/httpd-alias.conf || printf '%s\n' '$a' 'Alias /xxx /home/framework/domains/xxx.foobarcom.com/public_html/public' . w | \
+ sudo ed -s /etc/httpd/conf/extra/httpd-alias.conf
+
+printf '%s\n' '/^check_subdomain_owner=/s/1/0/' w | sudo ed  -s /usr/local/directadmin/conf/directadmin.conf
+
+sudo service httpd graceful
+sudo service directadmin reload

@@ -1,0 +1,24 @@
+#!/bin/bash
+account="p5.ie"
+[[ ! -x /bin/ed ]] && yum install -y ed
+
+read -r ipaddress < <(ip addr show dev eth0 | awk '/inet .+eth0$/ {gsub(/\/.+/,"",$2); print $2}')
+
+read -r hostis < <(awk "/$ipaddress/ {print \$NF}" /etc/hosts)
+
+printf "%s\n" "/HOSTNAME=/s/=.*/=$hostis/" w | ed -s /etc/sysconfig/network
+hostname "$hostis"
+
+
+[[ -f /etc/sysconfig/network-scripts/ifcfg-eth0:0 ]] && ifdown ifcfg-eth0:0 && rm -f /etc/sysconfig/network-scripts/ifcfg-eth0:0
+
+
+shopt -s nullglob
+oldip=(/usr/local/directadmin/data/admin/ips/*)
+
+for ip in "${oldip[@]}" ; do
+    if [[ -n $ip ]] ; then
+        ip="${ip##*/}"
+        /usr/local/directadmin/scripts/ipswap.sh "$ip" "$ipaddress"
+    fi
+done

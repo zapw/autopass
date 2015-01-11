@@ -1,0 +1,14 @@
+#!/bin/bash
+yum install -y php-pecl-zendopcache.x86_64 ; yum remove -y php-pecl-apc-3.1.15-0.4.20130912.el6.remi.5.4.x86_64
+cd /usr/lib64/php/modules/ && rm -f geoip.so 
+cd /usr/local/bin/ && rm -f geoip*
+cd /usr/local/lib/ && rm -f libGeo*
+cd /usr/local/include/ && rm -f GeoIP*
+cd /usr/local/share/ && rm -rf GeoIP
+yum install -y  GeoIP-devel.x86_64 GeoIP-update.noarch GeoIP.x86_64 php-pecl-geoip.x86_64
+cp -f /usr/local/etc/GeoIP.conf /etc/ ; geoipupdate -d /usr/share/GeoIP/
+
+cd /usr/lib64/php/modules/ && rm -f redis.so
+printf "%s\n" '/^extension=redis.so/d' w | ed -s /etc/php.ini
+
+yum install -y php-pecl-redis.x86_64

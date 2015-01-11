@@ -1,0 +1,27 @@
+[[ $HOSTNAME = web1.* ]] || [[ $HOSTNAME = "web1" ]] &&  enviro=qa || enviro=production
+
+[[ ! -x /bin/ed ]] && sudo yum install -y ed
+
+if grep -q ^#Custom /etc/sysconfig/httpd 2>/dev/null ; then
+   printf "%s\n" "/^#Custom/,/#EndCustom/c" "#Custom" "export SYS_PATH=/home/framework/foobarSys" "export APPLICATION_ENV=\"$enviro\"" \
+         'export ENVIRONMENT="P7WL"' "export ZF2_PATH=/home/framework/domains/xxx.foobar.com/public_html" "#EndCustom" "." "w" | sudo ed -s /etc/sysconfig/httpd
+else
+   printf "%s\n" "#Custom" "export SYS_PATH=/home/framework/foobarSys" "export APPLICATION_ENV=$enviro" \
+        "export ENVIRONMENT=\"P7WL\"" "export ZF2_PATH=/home/framework/domains/xxx.foobar.com/public_html" "#EndCustom" >>/etc/sysconfig/httpd
+fi
+
+if ! grep -q "/etc/sysconfig/httpd" /etc/init.d/httpd ; then
+	sudo ed -s /etc/init.d/httpd <<EOF
+/\. \/etc\/rc.d\/init.d\/functions/
++1
+a
+if [ -f /etc/sysconfig/httpd ]; then
+    . /etc/sysconfig/httpd
+fi
+.
+w
+EOF
+fi
+
+printf '%s\n' 'g/^ENV=/ s/^#\?/#' w | ed -s /etc/init.d/httpd
+service httpd restart

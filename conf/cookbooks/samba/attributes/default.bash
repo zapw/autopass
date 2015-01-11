@@ -1,0 +1,3 @@
+domainname=""
+apacheuser=""
+adminuser=""

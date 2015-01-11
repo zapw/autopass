@@ -1,0 +1,2 @@
+# file descriptor 4 is pointing to terminal, use 1>&4 4>&- ,to send stdout to terminal instead of remote server.
+# stdin is connected to terminal

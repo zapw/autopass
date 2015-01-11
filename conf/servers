@@ -1,0 +1,5 @@
+# insert ip or hostname followed by optional port number
+# example:
+# 1.1.1.1
+# host.com
+# host.com,2022

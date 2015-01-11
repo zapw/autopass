@@ -1,0 +1,6 @@
+echo $HOSTNAME
+ntpstat
+printf "%s\n" "/\/usr\/sbin\/ntpdate/s/^#*/#" w | ed -s /etc/crontab
+chkconfig ntpdate on
+chkconfig ntpd on
+ntpq -c peers

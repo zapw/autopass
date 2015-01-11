@@ -1,0 +1,846 @@
+#!/bin/bash
+#the script uses 'empty' http://empty.sourceforge.net/. Apply included patch or use already included patched version.
+
+conntimeo=30
+{ [[ -r "$HOME/.autopass/config" ]] && confdir="$HOME/.autopass";} || confdir="/usr/local/etc/autopass"
+runfilesdir="$confdir/runfiles"
+cookbookdir="$confdir/cookbooks"
+envdir="$confdir/environment"
+perservdir="$confdir/perserver"
+enableddir="$confdir/enabled"
+
+. "$confdir/config"
+shopt -s nullglob extglob
+
+for dir in runfilesdir envdir enableddir cookbookdir ; do
+    if [[ ! -d "${!dir}" ]] ; then
+        echo "$dir = ${!dir} - not found."
+	exit 1
+    fi
+done
+
+export confdir
+export cookbookdir
+export cookbook
+export recipefile
+export environment
+export tmpdir
+export envdir
+export perservdir
+export server
+export port
+export user
+
+declare -A cookbooks interpreter
+
+usage() {
+cat <<'EOF'
+Usage:
+ autopass [-j jobname ...] [-r cookbook|cookbook::recipe ...] [-s server[,port] ...] [-f file.log] [-v] [-q]
+ autopass -l
+ autopass -l -e|-le
+ autopass -e [[prio] jobname ...] [...]
+ autopass -d jobname|number ... 
+ autopass -p name|number ...
+ autopass -a jobname
+ autopass -h
+Options:
+  -l        List available jobs
+  -le       List enabled jobs
+  -j        Run job or multiplie jobs -j jobname1 -j jobname2 ...
+  -r        Run default recipe from cookbook or multiplie recipes -r cookbook cookbook::foo ...
+  -s        Connect to specific server or servers -s server1 -s server2,2022 ...
+  -v        verbose mode, echo input
+  -q        quiet mode, don't print session to stdout
+  -e        Enable and append new jobs by decreasing priority or by a prio number
+  -f        file.log This option allows to log the whole session
+  -d        Delete enabled job by its name or number 
+  -p        Print job by its name
+  -a        Create a new or edit an exisitng or new job
+  -h        Print this usage
+
+EOF
+exit 1
+}
+
+liflg=0
+enflg=0
+deflg=0
+prflg=0
+ejflg=0
+jnflg=0
+srflg=0
+loflg=0
+stflg=0
+defaultargs=([0]="-z" [1]="-O")
+
+declare -a password
+getpass() {
+ num="$1"
+ passwordtype="$2"
+ while IFS= read -s -p "${passwordtype}Password: " -e -r "password["$num"]" && [[ -z "${password["$num"]}" ]] ; do 
+  printf "\n"
+ done
+ printf "\n"
+}
+
+cleanup() {
+      local pid
+      if [[ -r "$tmpdir/empty.pid" ]] ; then
+          read -r pid <"$tmpdir/empty.pid"
+          kill "$pid" &>/dev/null
+          while kill -0 "$pid" &>/dev/null; do sleep 0.5 ; done
+      fi
+
+      kill -0 "$emptyproc" &>/dev/null && kill "$emptyproc" &>/dev/null
+      while kill -0 "$emptyproc" &>/dev/null ; do 
+           sleep 0.5
+      done
+      rm "$tmpdir"/{in,out}.fifo "$tmpdir/empty.pid" 2>/dev/null
+
+      if [[ $1 = all ]] ; then 
+	  rm -rf "$tmpdir"
+      fi
+}
+
+loadcookbookfromfile () {
+  local cookbookfromfile recipefromfile element
+  local -a array
+  skipcomment_and_empty='^[[:blank:]]*#'
+
+  if [[ -f "$cookbookdir/$1/depends" ]]; then
+       mapfile -t array <"$cookbookdir/$1/depends"
+       for element in "${array[@]}"; do
+             if [[ $element ]] && [[ ! $element =~ $skipcomment_and_empty ]]; then
+                 if [[ $element != "${element%%::*}" ]] ; then
+                     cookbookfromfile="${element%%::*}"
+                     recipefromfile="${element#*::}"
+                     loadcookbookfromfile $coobookfromfile
+                     if ! runlist+=("$(readlink -e "$cookbookdir/$cookbookfromfile/recipes/enabled-recipes/$recipefromfile" || 
+				readlink -e "$cookbookdir/$cookbookfromfile/recipes/$recipefromfile.bash")") ; then
+                        echo "$cookbookdir/$cookbookfromfile/recipes/"{enabled-recipes/$recipefromfile,$recipefromfile.bash} "not found"
+                        exit 1
+                     fi
+	             cookbooks["${runlist[@]: -1}"]="$cookbookfromfile"
+	         else
+                     loadcookbookfromfile $element
+	             if ! runlist+=("$(readlink -e "$cookbookdir/$element/recipes/enabled-recipes/default" || 
+			    readlink -e "$cookbookdir/$element/recipes/default.bash")") ; then
+		        echo "$cookbookdir/$element/recipes/"{enabled-recipes/default,default.bash} "not found"
+		        exit 1
+		     fi
+	             cookbooks["${runlist[@]: -1}"]="$element"
+                 fi 
+             fi
+       done
+  fi
+}
+
+trap "{ cleanup all; wait;} 2>/dev/null" EXIT
+
+OPTIND=1
+while getopts "s:j:r:f:p:lqedpahv-:" opt; do
+    case $opt in
+        h)
+            usage
+            ;;
+        l)
+            liflg=1
+            ;;
+        j)
+	    if [[ $OPTARG = -* ]] ; then
+		echo "-j requires job name"
+		exit 1
+	    else
+            	if ! runlist+=("$(readlink -e "$runfilesdir/$OPTARG")") ; then
+		      echo "$runfilesdir/$OPTARG not found"
+		      exit 1
+		fi
+	    fi
+	    while [[ ${!OPTIND} && ( ${!OPTIND} != -* ) ]] ; do
+            	   if ! runlist+=("$(readlink -e "$runfilesdir/${!OPTIND}")") ; then
+		         echo "$runfilesdir/${!OPTIND} not found"
+		         exit 1
+		   fi
+		   ((OPTIND++))
+	    done
+            jnflg=1
+            ;;
+        r)
+	    if [[ $OPTARG = -* ]] ; then
+		echo "-r requires cookbook name"
+		exit 1
+	    else
+                if [[ $OPTARG != "${OPTARG%%::*}" ]] ; then
+                    cookbook="${OPTARG%%::*}"
+                    recipe="${OPTARG#*::}"
+                    loadcookbookfromfile "$cookbook"
+
+            	    if ! runlist+=("$(readlink -e "$cookbookdir/$cookbook/recipes/enabled-recipes/$recipe" ||
+				  readlink -e "$cookbookdir/$cookbook/recipes/$recipe.bash")") ; then
+		          echo "$cookbookdir/$cookbook/recipes/"{enabled-recipes/$recipe,$recipe.bash} "not found"
+		          exit 1
+		    fi
+	            cookbooks["${runlist[@]: -1}"]="$cookbook"
+	        else
+                    loadcookbookfromfile "$OPTARG"
+
+	            if ! runlist+=("$(readlink -e "$cookbookdir/$OPTARG/recipes/enabled-recipes/default" ||
+                                   readlink -e "$cookbookdir/$OPTARG/recipes/default.bash")") ; then
+		          echo "$cookbookdir/$OPTARG/recipes/"{enabled-recipes/default,default.bash} "not found"
+		          exit 1
+		    fi
+	            cookbooks["${runlist[@]: -1}"]="$OPTARG"
+	        fi
+
+	        while [[ ${!OPTIND} && ( ${!OPTIND} != -* ) ]] ; do
+		       if [[ ${!OPTIND} != "${!OPTIND%%::*}" ]] ; then
+                           cookbook="${!OPTIND%%::*}"
+                           recipe="${!OPTIND#*::}"
+                    	   loadcookbookfromfile "${cookbook}"
+
+            	           if ! runlist+=("$(readlink -e "$cookbookdir/$cookbook/recipes/enabled-recipes/${recipe}" ||
+					  readlink -e "$cookbookdir/$cookbook/recipes/${recipe}.bash")") ; then
+		                echo "$cookbookdir/$cookbook/recipes/"{enabled-recipes/${recipe},$recipe.bash} "not found"
+		      	        exit 1
+		           fi
+	                   cookbooks["${runlist[@]: -1}"]="$cookbook"
+		       else
+                    	   loadcookbookfromfile "${!OPTIND}"
+            	           if ! runlist+=("$(readlink -e "$cookbookdir/${!OPTIND}/recipes/enabled-recipes/default" ||
+					   readlink -e "$cookbookdir/${!OPTIND}/recipes/default.bash")") ; then
+		                echo "$cookbookdir/${!OPTIND}/recipes/"{enabled-recipes/default,default.bash} "not found"
+			        exit 1
+		           fi
+	                   cookbooks["${runlist[@]: -1}"]="${!OPTIND}"
+		       fi
+		       ((OPTIND++))
+	        done
+	    fi
+            rnflg=1
+            ;;
+        s)
+	    if [[ $OPTARG = -* ]] ; then
+		echo "-s requires server name"
+		((OPTIND--))
+		continue
+	    else
+	   	servers+=("$OPTARG")
+	    fi
+	    while [[ ${!OPTIND} && ( ${!OPTIND} != -* ) ]] ; do
+		   servers+=("${!OPTIND}")
+		   ((OPTIND++))
+	    done
+            srflg=1
+            ;;
+        f)
+            loflg=1
+            logparam=("-L" "$OPTARG")
+            ;;
+        e)
+            enflg=1
+            ;;
+        v)
+	    unset -v 'defaultargs[0]'
+            ;;
+        q)
+	    stflg=1
+	    unset -v 'defaultargs[1]'
+            ;;
+        d)
+            deflg=1
+            (($# < 2)) && usage
+            ;;
+        p)
+            prflg=1
+	    printjobs+=("$OPTARG")
+            ;;
+        a)
+            ejflg=1
+            (($# < 2)) && usage
+            ;;
+        -)
+	    #example how to use long name trickery with getopts http://mywiki.wooledge.org/ComplexOptionParsing
+	    case $OPTARG in
+		   	env)
+			    if [[ ${!OPTIND} = -* || ${!OPTIND} = "" ]] ; then
+				echo "--env requires environment name"
+				exit 1
+	    		    else
+	   			environment="${!OPTIND}"
+				((OPTIND++))
+	    		    fi
+	    		    while [[ ${!OPTIND} && ( ${!OPTIND} != -* ) ]] ; do
+		   		environment="${!OPTIND}"
+		   		((OPTIND++))
+	    		    done
+            		    envflg=1
+            		;;
+		    	help)
+			usage
+			;;
+	    esac
+            ;;
+      '?')
+            usage
+            ;;
+    esac
+done
+
+shift "$((OPTIND-1))"
+: "${environment:=default}"
+declare -r environment
+
+#switches are not allowed to be combined, except srgflg with jnflg
+srorjnflg=$(( srflg || jnflg || rnflg ))
+enorliflg=$(( enflg || liflg ))
+x=$(( enorliflg + deflg + prflg + ejflg + srorjnflg ))
+(( (x * x) != x )) &&  usage
+
+if (( liflg && ! enflg )) ; then
+    echo "$runfilesdir/":
+    for list in "$runfilesdir/"* ; do 
+        ((++i)) 
+        echo "$i)${list##*/}"
+    done
+    exit 0
+fi
+
+if (( ( enflg + liflg ) == 2 )) ; then
+    echo "$enableddir/":
+    listen=("$enableddir/"*)
+    for list in "${listen[@]}" ; do 
+        ((++i)) 
+        echo "$i)${list##*/}"
+    done
+    exit 0
+fi
+if (( enflg )) ; then
+    (( $# )) || usage
+    #this will return 'fullpath/*' if there are no enabled jobs
+    linkorder=("$enableddir/"*) 
+    for arg ; do 
+        #check first argument for priority, if none push job to last from the list
+        if (( ! ${#prio[@]} )) && [[ $arg != +([[:digit:]]) ]] ; then
+            if [[ -z $ordernum ]] ; then
+                #check last enabled jobs
+		if [[ ${linkorder[@]} ]] ; then
+		    total="${#linkorder[@]}"
+                    ordernum="${linkorder[total-1]##*/}"
+
+                    #strip all characters from job name expect its digits
+                    ordernum="${ordernum%%[![:digit:]]*}"
+                    printf -v ordernum "%03d" "$((10#$ordernum + 1))"
+
+                else  
+		    printf -v ordernum "%03d" "1"
+                fi
+            fi
+            [[ ! -r "$runfilesdir/$arg" ]] && { echo unable to read "$runfilesdir/$arg" ; exit 1 ;}
+            if ln -sf "../${runfilesdir##*/}/$arg" "$enableddir/${ordernum}$arg" ; then
+		echo enabled "$enableddir/${ordernum}$arg"
+	    else
+		echo error, "$enableddir/${ordernum}$arg" not enabled
+	    fi
+            #convert number to base 10 (discards the leading zeros)
+            printf -v ordernum "%03d" "$((10#$ordernum + 1))"
+
+        elif [[ $arg = +([[:digit:]]) ]] ; then
+              [[ $lookforprio = "true" ]] && unset -v prio
+              prio+="$(printf "%03d" "$arg")"
+        else
+              lookforprio=true
+              for p in "${prio[@]}" ; do
+                  if ln -sf "../${runfilesdir##*/}/$arg" "$enableddir/${prio}$arg" ; then
+	              echo enabled "$enableddir/${prio}$arg"
+		  else
+		      echo error, "$enableddir/${prio}$arg" not enabled
+	     	  fi
+              done
+        fi
+    done
+    exit 0
+fi
+
+if (( deflg )) ; then
+    echo "$enableddir/":
+    while (( $# )) ; do
+           if [[ $1 = +([[:digit:]]) ]] ; then
+		       bynum+=("$1")
+	       else
+		       byname+=("$1")
+	       fi
+           shift
+    done
+    
+    if (( ${#bynum[@]} )); then
+        enlist=("$enableddir/"*)
+	    set -- "${bynum[@]}"
+        while (( $# )) ; do
+               i=0
+               for list in "${enlist[@]}" ; do 
+                    (( ++i ))
+                    (( i > $1 )) && { shift; break ;}
+	                for (( y=1; y<=$#; y++ )) ; do
+                         #delte job if parameter matches job number
+                         if (( $1 == i )) ; then
+	                         rm "$list" && { echo deleted "$list" ;}
+                             unset -v 'bynum[y-1]'
+                             bynum=("${bynum[@]}")
+	                     break 2
+                         fi
+	                done
+               done
+               shift
+        done
+    fi
+
+    if (( ${#byname[@]} )); then
+        for job in "${byname[@]/#/$enableddir/}"; do
+	        rm "$job" && { echo deleted "$job" ;}
+        done
+    fi
+
+    #if there are still jobs in bynum array it means they weren't found/matched
+    for element in "${bynum[@]}" ; do
+   	    echo "job number $element not found"
+    done
+
+    exit 0
+fi
+	    
+if (( ! ${#servers[@]} )) && [[ -f "$confdir/servers" ]] ; then
+     while read -r server ; do 
+	    [[ $server =~ ^(#|$) ]] && continue 
+	    servers+=("$server") 
+     done <"$confdir/servers"
+fi
+
+if (( ! ${#servers[@]} )) ; then
+      { echo -e "supply server list via command line: ${0##*/} [-s servername1 ...] or in: $confdir/servers"; exit 1 ;}
+elif (( ! srflg )) ; then
+      echo "Loading servers list from $confdir/servers"
+fi
+
+if (( ( rnflg + jnflg ) == 0  )) ; then
+    for dstlink in "$enableddir/"* ; do
+         if ! runlist+=("$(readlink -e "$dstlink")") ; then
+               echo "$dstlink not found"
+	       exit 1
+	 fi
+    done
+fi
+
+for runfile in "${runlist[@]}" ; do
+     shebang="$(head -n1 "$runfile")"
+     if [[ ${shebang#'#!'} != "$shebang" ]]; then
+	  if [[ $shebang = "#!/bin/env "* ]]; then
+               interpreter["$runfile"]=${shebang#'#!/bin/env'[[:blank:]]}
+          else
+               interpreter["$runfile"]="${shebang#'#!'}"
+          fi
+     fi
+done
+
+read -p "Username: " -e -r user
+getpass 0 "(Primary)" 1>&2
+getpass 1 "(Secondary)" 1>&2
+
+(( ! ${#password[@]} )) && exit 1
+: ${user:=$USER}
+
+
+tmpdir="$(mktemp -d)" || exit 1
+getsudo() {
+  local returnval
+  empty -s -c -o "$tmpdir/in.fifo" <<<"read -r -s -p Getsudo\$'\n' -a sudopass && printf \"%s\n\" \"\${sudopass[@]}\" | sudo -S -v && { sudo PATH=/bin:/usr/bin:/sbin:/usr/sbin:/usr/local/bin:/usr/local/sbin/bin HISTFILE= /bin/bash --noprofile --noediting --norc -c 'echo Authenticated.; PS1= PS2= HISTFILE= exec /bin/bash --noprofile --noediting --norc';} && exit"
+
+  empty -w -i "$tmpdir/out.fifo" -o "$tmpdir/in.fifo" Getsudo
+  returnval=$?
+
+  if (( returnval == 1 )) ; then
+      empty -s -c -o "$tmpdir/in.fifo" <<<"${password[@]}"
+
+      empty -w -i "$tmpdir/out.fifo" -o "$tmpdir/in.fifo" 'incorrect password attempts' '' 'may not run sudo on' '' 'Authenticated.' ''	
+      returnval=$?
+
+      if (( returnval == 1 )) ; then
+          empty -s -c -o "$tmpdir/in.fifo" <<<"sudo PATH=/bin:/usr/bin:/sbin:/usr/sbin:/usr/local/bin:/usr/local/sbin/bin HISTFILE= /bin/bash --noprofile --noediting --norc -c 'echo Authenticated.; PS1= PS2= HISTFILE= exec /bin/bash --noprofile --noediting --norc' && exit"
+
+          empty -w -i "$tmpdir/out.fifo" -o "$tmpdir/in.fifo" 'password for' '' 'Authenticated.' ''
+          returnval=$?
+          if (( returnval == 1 )) ; then
+               echo unable to sudo bad passwords
+	       { cleanup; wait ;} 2>/dev/null
+               continue
+	  elif (( returnval == 2 )) ; then
+                 empty -s -c -o "$tmpdir/in.fifo" <<<"unset -v 'sudopass'"
+          fi
+
+
+      elif (( returnval == 2 )) ; then
+             echo user not allowed to run sudo
+	     { cleanup; wait ;} 2>/dev/null
+             continue
+
+      elif (( returnval == 3 )) ; then
+             empty -s -c -o "$tmpdir/in.fifo" <<<"unset -v 'sudopass'"
+      else
+           echo unable to match keyphrase to sudo prompt
+           exit 1
+      fi
+
+  elif (( returnval == 255 )) ; then
+         echo unable to match keyphrase to sudo prompt
+         exit 1
+  else
+       echo unknown return code from empty
+       exit 1
+  fi
+  empty -s -o "$tmpdir/in.fifo" "set +o history +o histexpand;shopt -s huponexit\n"
+}
+
+functions_def () {
+      [[ -f "${envdir}/functions.$1" ]] && empty -s -c -o "$tmpdir/in.fifo" <"${envdir}/functions.$1"
+}
+
+environment_data () {
+  for env in "${environment[@]}" ; do
+      if [[ ${cookbooks["$runfile"]} ]] ; then
+          cat "${cookbookdir}/${cookbooks["$runfile"]}/attributes/default.${invoke}" \
+		"${cookbookdir}/${cookbooks["$runfile"]}/attributes/"!(default)."${invoke}" 2>/dev/null| empty -s -c -o "$tmpdir/in.fifo"
+          cat "${envdir}/default/${cookbooks["$runfile"]}/default.${invoke}" \
+		"${envdir}/default/${cookbooks["$runfile"]}/"!(default)."${invoke}" 2>/dev/null| empty -s -c -o "$tmpdir/in.fifo"
+          if [[ "$environment" != default && -n "$environment" ]] ; then
+              cat "${envdir}/$environment/${cookbooks["$runfile"]}/default.${invoke}" \
+		    "${envdir}/$environment/${cookbooks["$runfile"]}/"!(default)."${invoke}" 2>/dev/null| empty -s -c -o "$tmpdir/in.fifo"
+          fi
+	  cat "$perservdir/$server/${cookbooks["$runfile"]}/default.${invoke}" \
+		"$perservdir/$server/${cookbooks["$runfile"]}/"!(default)."${invoke}" 2>/dev/null| empty -s -c -o "$tmpdir/in.fifo"
+      fi
+  done
+}
+
+interact_data () {
+  if [[ ${cookbooks["$runfile"]} ]] ; then
+     cookbook="${cookbooks["$runfile"]}"
+     if [[ $# != 1 || $1 = "" ]] ; then
+         echo "function $FUNCNAME takes two none null arguments"
+	 return 1
+     fi
+     if [[ $1 = preconnect ]] ; then
+	 if [[ -n "${inter_pre_arr["$runfile"]}" ]] ; then
+             empty -s -c -o "$tmpdir/in.fifo" <<<"${inter_pre_arr["$runfile"]}"
+         fi
+     elif [[ $1 = postconnect ]] ; then
+           if [[ -x "${cookbookdir}/${cookbooks["$runfile"]}/interactcode/postconnect/${runfile##*/}" ]] ; then
+               "${cookbookdir}/${cookbooks["$runfile"]}/interactcode/postconnect/${runfile##*/}" 4>&2 > >(empty -s -c -o "$tmpdir/in.fifo")
+           fi
+     fi
+  fi
+}
+
+template_data () {
+  if [[ ${cookbooks["$runfile"]} ]] ; then
+     cat /dev/null "${cookbookdir}/${cookbooks["$runfile"]}/templates/"*."${invoke}" | empty -s -c -o "$tmpdir/in.fifo"
+  fi
+}
+
+tail_pid () {
+  local pid
+  read -r pid <"$tmpdir/empty.pid" || { echo failed to read 'empty' pid; exit 1; }
+  #check if empty is alive
+  kill -0 "$pid" 2>/dev/null || exit 1 
+}
+
+checksyntax () {
+  stderr_output="$("$invoke" "${parse_cmd_args[@]}" "$@" 2>&1)" || { echo "$stderr_output";exit 1;}
+}
+
+tmplength="timeout in ${conntimeo}s press 's' to skip"
+tmplength="-${#tmplength}"
+
+#search for syntax errors in relevant scripts
+for job in "${runlist[@]}" ; do
+   if [[ ${interpreter["$job"]} ]] ; then
+        tmpinterpreter=${interpreter["$job"]}
+   else
+        tmpinterpreter="/bin/bash"
+   fi
+
+   invoke="${tmpinterpreter##*/}"
+   invoke="${invoke%%" "*}"
+   case $invoke in
+	  bash)
+	       parse_cmd_args=("-n" "-O" "extglob")
+	       ;;
+	  perl)
+	       parse_cmd_args=("-c")
+	       ;;
+	python)
+	       parse_cmd_args=("-m" "py_compile")
+	       ;;
+	     *)
+	       printf "\n\n\n%s" "Warning: Unknown interpreter <$invoke>. Not checking for syntax errors!"
+	       continue
+	       ;;
+   esac
+   for file in "${envdir%/}/"{functions,postconnect,preconnect,interactcode}."$invoke"; do
+       if [[ -f "$file" ]]; then
+	    checksyntax "$file" 
+       fi
+   done
+
+   if [[ ${cookbooks["$job"]} ]] ; then
+       cookbook="${cookbooks["$job"]}"
+       recipefile="${job##*/}"
+
+       for attribute_file in "${cookbookdir}/${cookbooks["$job"]}/attributes/"*."${invoke}" \
+		"${envdir}/default/${cookbooks["$job"]}/"*."${invoke}" \
+		"$perservdir/$server/${cookbooks["$job"]}/"*."${invoke}"; do
+
+	     checksyntax "$attribute_file"
+       done
+       if [[ "$environment" != default && -n "$environment" ]] ; then
+            for attribute_file in "${envdir}/$environment/${cookbooks["$job"]}/"*."${invoke}"; do 
+	         checksyntax "$attribute_file"
+	    done
+       fi
+       for template in "${cookbookdir}/${cookbooks["$job"]}/templates/"*."${invoke}" ; do
+		checksyntax "$template"
+       done
+       if [[ -x "${cookbookdir}/$cookbook/interactcode/preconnect/$recipefile" ]] ; then
+            checksyntax "${cookbookdir}/$cookbook/interactcode/preconnect/$recipefile"
+       fi
+       if [[ -x "${cookbookdir}/$cookbook/preconnect/$recipefile" ]] ; then
+            checksyntax "${cookbookdir}/$cookbook/preconnect/$recipefile"
+       fi
+       if [[ -x "${cookbookdir%/}/${cookbooks["$job"]}/postconnect/prerecipes/${job##*/}" ]] ; then
+	    checksyntax "${cookbookdir%/}/${cookbooks["$job"]}/postconnect/prerecipes/${job##*/}"
+       fi
+       if [[ -x "${cookbookdir%/}/${cookbooks["$job"]}/postconnect/postrecipes/${job##*/}" ]] ; then
+	    checksyntax "${cookbookdir%/}/${cookbooks["$job"]}/postconnect/postrecipes/${job##*/}"
+       fi
+   fi
+   checksyntax "$job"
+done 
+
+declare -A inter_pre_arr pre_arr
+savedrunlist=("${runlist[@]}")
+
+i=0
+for job in "${runlist[@]}" ; do
+   if [[ ${cookbooks["$job"]} ]] ; then
+       cookbook="${cookbooks["$job"]}"
+       recipefile="${job##*/}"
+       if [[ -x "${cookbookdir}/$cookbook/preconnect/$recipefile" && ! -x "${cookbookdir}/$cookbook/interactcode/preconnect/$recipefile" ]] ; then
+           pre_arr["$job"]="$("${cookbookdir}/$cookbook/preconnect/$recipefile" "${servers[@]%,*}")"
+           returnval="$?"
+           if [[ $returnval != 0 ]] ; then
+               printf "%s\n" "##FAIL## preconnect script: $cookbook::$recipefile exited on $returnval" "Perhaps forgot to load environment data? --env ..."
+	       exit $returnval
+           fi
+	   unset -v 'runlist[i]'
+       fi
+   fi
+   ((i++))
+done 4>&2
+
+for job in "${runlist[@]}" ; do
+   if [[ ${cookbooks["$job"]} ]] ; then
+       cookbook="${cookbooks["$job"]}"
+       recipefile="${job##*/}"
+       if [[ -x "${cookbookdir}/$cookbook/interactcode/preconnect/$recipefile" ]] ; then
+           inter_pre_arr["${job}"]="$("${cookbookdir}/$cookbook/interactcode/preconnect/$recipefile" "${servers[@]%,*}")" || exit 1
+       fi
+       if [[ -x "${cookbookdir}/$cookbook/preconnect/$recipefile" ]] ; then
+           pre_arr["$job"]="$(interact_pre_connect="${inter_pre_arr["$job"]}" "${cookbookdir}/$cookbook/preconnect/$recipefile" "${servers[@]%,*}")"
+           returnval="$?"
+           if [[ $returnval != 0 ]] ; then
+               printf "%s\n" "##FAIL## preconnect script: $cookbook::$recipefile exited on $returnval" "Perhaps forgot to load environment data? --env ..."
+	       exit $returnval
+           fi
+       fi
+
+   fi
+done 4>&2
+
+runlist=("${savedrunlist[@]}")
+unset -v savedrunlist
+
+#iterate through the servers list
+for server in "${servers[@]}" ; do
+  if [[ $server =~ ,[0-9]+$ ]] ; then 
+      connectserv=("${server%,*}" -p "${server##*,}")
+      port="${server##*,}"
+      server="${server%,*}"
+  else
+      connectserv=("$server")
+  fi
+  : ${port:=22}
+
+  #connect to the server
+  if (( $stflg != 1 )) ; then
+      printf "\n\n%s\e[4m%s\n\e[0m" "connecting to server " "$server"
+  fi
+
+  export SSH_AGENT_PID=$SSH_AGENT_PID SSH_AUTH_SOCK=$SSH_AUTH_SOCK
+  empty -f -i "$tmpdir/in.fifo" -o "$tmpdir/out.fifo" -p "$tmpdir/empty.pid" "${defaultargs[@]}" "${logparam[@]}" \
+	ssh -M -q -o ControlPath="$tmpdir/%h-%p-%r" -o CheckHostIP=no -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o ConnectTimeout="$conntimeo" -t "$user@${connectserv[@]}" "PS1='_prompt_ ' PS2= HISTFILE= /bin/bash --noediting --noprofile --norc" || exit 1
+  tail_pid
+
+  #check if succesfully logged or if we got a password prompt
+  empty -w -t "$conntimeo" -i "$tmpdir/out.fifo" -o "$tmpdir/in.fifo" '_prompt_' '' '\<[Pp]assword:' '' 'Enter passphrase for key' '' &
+  emptyproc=$!
+
+  i="$conntimeo"
+
+  printf "\n"
+  while kill -0 "$emptyproc" 2>/dev/null; do
+       (( i < ($conntimeo - 1) )) &&  printf "%${tmplength}s\r"  "timeout in ${i}s press 's' to skip"
+       ((i--))
+       sleep 1
+  done &
+
+  #discard any garbage input from user while connecting
+  IFS= read -t0.000001 -r -d '' discard
+  #while waiting for prompt allow to break and skip connection
+  while kill -0 "$emptyproc" 2>/dev/null && [[ $skip != s ]] ; do read -N1 -s -t 1 skip  ; done
+  if [[ $skip == s ]] ; then
+      unset -v 'skip'
+      { cleanup; wait ;} 2>/dev/null
+      continue
+  fi
+
+  wait "$emptyproc"
+  returnval=$?
+
+
+  # = 1 return code we are in without password prompt (possibly using ssh keys) 
+  # = 2 return code from empty (second pair) means we got a password prompt
+  # = 3 means either private key wasn't saved to ssh-agent or host dosen't have our pubkey.
+  if (( returnval == 3 )) ; then
+       #fall back to password authentication
+       empty -s -o "$tmpdir/in.fifo" "\n"
+
+       empty -w -i "$tmpdir/out.fifo" -o "$tmpdir/in.fifo" '_prompt_' '' '\<[Pp]assword:' 2>/dev/null
+       returnval=$?
+  fi
+  
+  if (( returnval == 2 )) ; then
+      empty -s -c -o "$tmpdir/in.fifo" <<<"${password[0]}"
+      #recheck for login status
+      empty -w -i "$tmpdir/out.fifo" -o "$tmpdir/in.fifo" '_prompt_' '' '\<[Pp]assword:' 2>/dev/null
+
+      returnval=$?
+      if (( returnval == 2 )) ; then
+          #try second password
+          empty -s -c -o "$tmpdir/in.fifo" <<<"${password[1]}"
+          #recheck for login status
+          empty -w -i "$tmpdir/out.fifo" -o "$tmpdir/in.fifo" '_prompt_' '' '\<[Pp]assword:' 2>/dev/null
+
+          returnval=$?
+	  #both passwords failed.
+          if (( returnval == 2 )) ; then
+              echo "Failed to authenticate, bad passwords/username"
+              { cleanup; wait; } 2>/dev/null
+              continue
+	  #we are in using second password
+          elif (( returnval != 1 )) ; then
+		echo unknown response
+                exit 1
+	  fi
+      fi
+  elif (( returnval != 1 )) ; then
+        echo -e "\nUnable to connect to $server\n"
+        { cleanup; wait;} 2>/dev/null
+	continue
+  fi
+  printf "%${tmplength}s\r"
+  empty -s -o "$tmpdir/in.fifo" "unset -v 'PS1' 'PS2';stty -echo;echo '        '\n"
+  empty -w -i "$tmpdir/out.fifo" -o "$tmpdir/in.fifo" '^\ '
+
+  getsudo
+  if [[ ${runlist[@]} ]] ; then
+      empty -s -c -o "$tmpdir/in.fifo" <<<'printf "\n%s\n" "===executing runlist==="'
+      #Wait for the keyword, until remote terminal is ready to receive more input commands.
+      empty -w -t 3600 -i "$tmpdir/out.fifo" -o "$tmpdir/in.fifo" runlist
+  fi
+
+  for runfile in "${runlist[@]}" ; do 
+       if [[ ${interpreter["$runfile"]} ]] ; then
+           tmpinterpreter=${interpreter["$runfile"]}
+       else
+           tmpinterpreter="/bin/bash"
+       fi
+
+       cookbook=${cookbooks["$runfile"]} 
+       recipefile=${runfile##*/}
+       if [[ -x "${cookbookdir%/}/${cookbooks["$runfile"]}/postconnect/prerecipes/${runfile##*/}" ]] ; then
+           printf "%s %s  %s " "Running" "pre-recipe" "===${cookbooks["$runfile"]}::${runfile##*/}==="
+           functions_def "$invoke"
+           environment_data
+           interact_data "preconnect"
+           interact_data "postconnect"
+           template_data
+
+       	   if interact_pre_connect="${inter_pre_arr["$runfile"]}" pre_connect="${pre_arr["$runfile"]}" \
+		  "${cookbookdir%/}/${cookbooks["$runfile"]}/postconnect/prerecipes/${runfile##*/}" ; then
+	        echo "##Success##"
+	   else
+		echo "##Fail##"
+		break 2
+	   fi
+       fi
+       empty -s -o "$tmpdir/in.fifo" "$tmpinterpreter <<'EEOOFF'\n"
+       invoke="${tmpinterpreter##*/}"
+       invoke="${invoke%%" "*}"
+       functions_def "$invoke"
+       environment_data
+       interact_data "preconnect"
+       interact_data "postconnect"
+       template_data
+
+       if [[ ${cookbooks["$runfile"]} ]] ; then
+	   printf "%s %s %s " "Running" "main-recipe" "===${cookbooks["$runfile"]}::${runfile##*/}==="
+       else
+	   printf "%s %s %s " "Running" "job" "===${runfile##*/}==="
+       fi
+       if [[ ${interpreter["$runfile"]} ]] ; then 
+	    sed 1d "$runfile" | empty -s -c -o "$tmpdir/in.fifo"
+       else
+	    empty -s -c -o "$tmpdir/in.fifo" <"$runfile"
+       fi
+       empty -s -o "$tmpdir/in.fifo" "EEOOFF\nrtval=\$? ; if [[ \$rtval != 0 ]] ; then echo \"##Fail##\
+ - $runfile exited on \$rtval\"; else echo '##Success##' ;fi\n"
+       empty -w -t 3600 -i "$tmpdir/out.fifo" -o "$tmpdir/in.fifo" '##Fail##' '' '##Success##' ''
+       case $? in
+   	    1) 
+  	      break 2
+	      ;;
+	    2)
+   	      ;;
+	    *)
+	      break 2
+	      ;;
+       esac
+       if [[ -x "${cookbookdir%/}/${cookbooks["$runfile"]}/postconnect/postrecipes/${runfile##*/}" ]] ; then
+           printf "%s %s %s " "Running" "post-recipe" "===${cookbooks["$runfile"]}::${runfile##*/}==="
+           if interact_pre_connect="${inter_pre_arr["$runfile"]}" pre_connect="${pre_arr["$runfile"]}" \
+		"${cookbookdir%/}/${cookbooks["$runfile"]}/postconnect/postrecipes/${runfile##*/}" ; then
+	       echo "##Success##"
+	   else
+	       echo "##Fail##"
+	       break 2
+	   fi
+       fi
+       #empty -s -o "$tmpdir/in.fifo" "printf '\n%s\n' '=='\n"
+  done
+
+  #wait for last keyword
+  empty -s -o "$tmpdir/in.fifo" "echo '##End##'\n"
+  empty -w -t 3600 -i "$tmpdir/out.fifo" -o "$tmpdir/in.fifo" End
+
+  { cleanup; wait ;} 2>/dev/null
+done
+printf "\n"

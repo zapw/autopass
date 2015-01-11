@@ -1,0 +1,13 @@
+echo $HOSTNAME
+[[ ! -x /bin/ed ]] && yum install -y ed
+[[ ! -x /usr/sbin/ntpd ]] && yum install -y ntp ntpdate
+ntpstat
+
+if ! ntpstat &>/dev/null ; then 
+   service ntpdate start
+   service ntpd start && { printf "%s\n" "/\/usr\/sbin\/ntpdate/s/^/#" w | ed -s /etc/crontab ;}
+   chkconfig ntpdate on
+   chkconfig ntpd on
+fi
+grep -E ^"server " /etc/ntp.conf
+ntpq -c peers

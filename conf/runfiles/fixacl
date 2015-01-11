@@ -1,0 +1,4 @@
+find /data -type d -exec setfacl -m u:apache:rwx -m g:apache:rwx -m u:wwwrun:rwx -m g:wwwrun:rwx {} \;
+find /data -type d -exec setfacl -d -m u:apache:rwx -m g:apache:rwx -m u:wwwrun:rwx -m g:wwwrun:rwx {} \;
+#grep 'nfs1.hk1:/data[[:space:]]+/mnt/nfs/data[[:space:]]+nfs[[:space:]]+(,?acl(,|[[[:space:]]+)'
+#nfs[[:space:]]+([^[:space:]]+,)?acl[,[:space:]]
