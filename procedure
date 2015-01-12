@@ -1,0 +1,33 @@
+my parent isn't tmux
+then 
+get -x variable
+tmux ... $0 -x ...
+
+if my parent is tmux then get  -x parameter
+
+username password etc...
+
+....
+....
+
+
+
+tmux command to open -x windows
+
+array=tmux list-windows 
+
+value=${#servers[@]} / -x parameter
+
+for spawnp in array ; do
+tvalue+=value
+{ for server in ${servers[tvalue-value] ...servers[tvalue] 
+...
+..
+
+.. done } >spawnp &
+
+done
+
+wait 
+
+cleanup
