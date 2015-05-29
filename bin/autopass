@@ -48,7 +48,8 @@ Example:
 Environment data:
   --env	dirname	  
 	       Where dirname is a subdirectory under $confdir/environment/. For example '--env standard'. Will load for currently 
-		executing cookbook, attributes data from $confdir/environment/standard/$cookbook. where $cookbook is the currently executing cookbook from the runlist.
+		executing cookbook, attributes data from $confdir/environment/standard/$cookbook.  Where $cookbook,
+		is the currently executing cookbook from the runlist.
 		( by default attributes from $confdir/environment/default/$cookbook, are loaded first for every executing cookbook in the runlist.)
 
 Other options:
