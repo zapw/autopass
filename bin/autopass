@@ -36,27 +36,28 @@ declare -A cookbooks interpreter
 usage() {
 cat <<'EOF'
 Usage:
- autopass [-j jobname ...] [-r cookbook|cookbook::recipe ...] [-s server[,port] ...] [-f file.log] [-v] [-q]
+ autopass [-r cookbook|cookbook::recipe ...] [-j jobname ...] [-s server[,port] ...] [-f file.log] [-v] [-q] [--env dirname]
  autopass -l
- autopass -l -e|-le
- autopass -e [[prio] jobname ...] [...]
- autopass -d jobname|number ... 
- autopass -p name|number ...
- autopass -a jobname
  autopass -h
 Options:
+  -r 	    Add cookbook/recipe to the runlist. To specify a recipe append '::' after the cookbook name 
+		( leave it out to execute default recipe)
+Example:
+  	cookbook::recipe ...
+
+Environment data:
+  --env	dirname	  
+	       Where dirname is a subdirectory under $confdir/environment/. For example '--env standard'. Will load for currently 
+		executing cookbook, attributes data from $confdir/environment/standard/$cookbook 
+		( by default attributes from $confdir/environment/default/$cookbook, are loaded first for every executing cookbook in the runlist.)
+
+Other options:
+  -j        Run job or multiplie jobs one after another by order -j jobname1 jobname2 ...
+  -s        Execute cookbook/job runlist on each server by order: -s server1 server2,2022 ...
   -l        List available jobs
-  -le       List enabled jobs
-  -j        Run job or multiplie jobs -j jobname1 -j jobname2 ...
-  -r        Run default recipe from cookbook or multiplie recipes -r cookbook cookbook::foo ...
-  -s        Connect to specific server or servers -s server1 -s server2,2022 ...
   -v        verbose mode, echo input
   -q        quiet mode, don't print session to stdout
-  -e        Enable and append new jobs by decreasing priority or by a prio number
   -f        file.log This option allows to log the whole session
-  -d        Delete enabled job by its name or number 
-  -p        Print job by its name
-  -a        Create a new or edit an exisitng or new job
   -h        Print this usage
 
 EOF
