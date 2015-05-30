@@ -4,24 +4,39 @@ centers_hostnames=("web1")
 
 umask 0022
 
+
 banner () {
- if (( $# > 1 )); then
+  local string element length norefresh rows cols
+  if (( $# > 1 )) && [[ $1 = norefresh ]]; then
       norefresh=1
       shift
- else
-      printf "%${COLUMNS:-80}s\r" ""
- fi
- for element in "$@"; do
-     (( stringnum += ${#element} ))
- done
+  else
+      printf "%$(tput cols)s\r"
+  fi
+  for element in "$@"; do
+      (( length += ${#element} ))
+  done
 
- while kill -0 $! 2>/dev/null ; do
+  IFS= string="$*"
+
+  length=$(( length + 2 ))
+
+  colsrowcalc () {
+     cols=$(tput cols)
+     rows=$(( ( length / cols ) * cols ))
+     [[ ${string:0:$rows} ]] && printf "%s\n" "${string:0:$rows}"
+  }
+  colsrowcalc
+
+  while kill -0 $! 2>/dev/null; do
         for v in '|' '/' '-' '\' '|' '/' '-' '\' ; do
-	     printf -vspace "%$((${COLUMNS:-80}-$((stringnum-2))))s" ""
-             sleep 0.1 ; printf "$@ %s$space\r" "$v"
+              if (( $(tput cols) != cols )); then
+                   colsrowcalc
+              fi
+              sleep 0.1 ; printf "%s\r" "${string:$rows} $v"
         done
- done
- [[ $norefresh ]] || printf "%${COLUMNS:-80}s\r" ""
+  done
+  [[ $norefresh ]] || printf "%$(tput cols)s\r"
 }
 
 bashversion () {

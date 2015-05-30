@@ -2,9 +2,22 @@
 bashversion
 
 declare -A DocumentRoot type name filesite allsites csum
-export src_environment curl_contimeout curl_maxtime
+export src_environment curl_contimeout curl_maxtime sitesnumfile
 
+exitfun () {
+ rm $sitesnumfile 2>/dev/null
+}
+trap "exitfun" EXIT 
 exec 6>&1
+banner () {
+ while kill -0 $! 2>/dev/null ; do
+        for v in '|' '/' '-' '\' '|' '/' '-' '\' ; do
+             sleep 0.1 ; printf "Scanning for sites in environment <$src_environment> using <$uripath>. Total $(tail -1 "$sitesnumfile") sites left %s\r" "$v"
+        done
+ done
+ printf "%${COLUMNS:-80}s\r" ""
+}
+
 if [[ ! ${src_environment} ]] ; then
      src_environment="$(hostname -f)"
      src_environment="${src_environment#*.}"
@@ -47,15 +60,19 @@ else
      done
 fi
 
-SECONDS=
+sitesnumfile=$(mktemp)
+echo "${#sites[@]}" >$sitesnumfile
 tmp_sites=("${!sites[@]}")
+SECONDS=
 domains=(
      $(xargs -n1 -P"${max_curl_procs}" /bin/bash -c 'read -r line < <(curl -s --connect-timeout "$curl_contimeout" --max-time "$curl_maxtime" -H"Host: ${0%%./*}" "http://$0" 2>/dev/null)
+             read -r num < <(tail -1 $sitesnumfile)
+	     echo $((--num)) >>"$sitesnumfile"
              shopt -s extglob
 	     host=${line%%@( |<|>|-)*}
 	     if [[ $src_environment = "${host#*.}" ]] ; then
                   echo "${0%%./*}"
-	     fi' <<<"${tmp_sites[@]/%/./${uripath#/}}" & banner "Scanning for sites in environment <$src_environment> using <$uripath>" >&6)
+	     fi' <<<"${tmp_sites[@]/%/./${uripath#/}}" & banner >&6)
 )
 seconds=$SECONDS
 if (( seconds < 60 )); then
@@ -65,6 +82,7 @@ elif (( seconds >= 60 )); then
        seconds=$(( seconds % 60 ))
 fi
 printf "scan time %s minutes %s seconds.\n" "$min" "$seconds"
+rm "$sitesnumfile"
 
 sedversion=($(sed --version  | awk  '{gsub(/\./," ",$NF);print $NF ; exit}'))
 
