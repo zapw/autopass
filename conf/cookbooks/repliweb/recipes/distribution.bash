@@ -10,6 +10,7 @@ exitfun () {
 trap "exitfun" EXIT 
 exec 6>&1
 banner () {
+ local v
  while kill -0 $! 2>/dev/null ; do
         for v in '|' '/' '-' '\' '|' '/' '-' '\' ; do
              sleep 0.1 ; printf "Scanning for sites in environment <$src_environment> using <$uripath>. Total $(tail -1 "$sitesnumfile") sites left %s\r" "$v"

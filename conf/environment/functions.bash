@@ -6,7 +6,7 @@ umask 0022
 
 
 banner () {
-  local string length norefresh rows cols
+  local string length norefresh rows cols v
   if (( $# > 1 )) && [[ $1 = norefresh ]]; then
       norefresh=1
       shift
