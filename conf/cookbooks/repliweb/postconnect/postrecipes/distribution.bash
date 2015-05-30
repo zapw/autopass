@@ -97,7 +97,7 @@ searchsite () {
     : nomatch
     n
     b loop' &
-    banner norefresh "Scanning keytype <${umatchedsum[$key]}> in $# directories. Total keys left ${#umatchedsum[@]} " 1>&6)
+    banner norefresh "Scanning keytype <${umatchedsum[$key]}> in $# directories. Total keys left ${#umatchedsum[@]}" 1>&6)
 
  if [[ $uri ]]; then 
       domainsvnpath[$uri]=${csum[$key]%,}

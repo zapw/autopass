@@ -6,25 +6,22 @@ umask 0022
 
 
 banner () {
-  local string element length norefresh rows cols
+  local string length norefresh rows cols
   if (( $# > 1 )) && [[ $1 = norefresh ]]; then
       norefresh=1
       shift
   else
       printf "%$(tput cols)s\r"
   fi
-  for element in "$@"; do
-      (( length += ${#element} ))
-  done
 
   IFS= string="$*"
-
-  length=$(( length + 2 ))
+  length=$(( ${#string} + 2 ))
 
   colsrowcalc () {
      cols=$(tput cols)
      rows=$(( ( length / cols ) * cols ))
      [[ ${string:0:$rows} ]] && printf "%s\n" "${string:0:$rows}"
+     space=$(( ( rows + cols ) - length ))
   }
   colsrowcalc
 
@@ -33,7 +30,7 @@ banner () {
               if (( $(tput cols) != cols )); then
                    colsrowcalc
               fi
-              sleep 0.1 ; printf "%s\r" "${string:$rows} $v"
+              sleep 0.1 ; printf "%s%${space}s\r" "${string:$rows} $v"
         done
   done
   [[ $norefresh ]] || printf "%$(tput cols)s\r"
