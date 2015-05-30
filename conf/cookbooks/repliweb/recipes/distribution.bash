@@ -9,14 +9,31 @@ exitfun () {
 }
 trap "exitfun" EXIT 
 exec 6>&1
+
 banner () {
- local v
- while kill -0 $! 2>/dev/null ; do
+  local string length rows cols v
+  printf "%$(tput cols)s\r"
+
+  colsrowcalc () {
+     string="Scanning for sites in environment <$src_environment> using <$uripath>. Total $(tail -1 "$sitesnumfile") sites left"
+     length=$(( ${#string} + 2 ))
+     cols=$(tput cols)
+     rows=$(( ( length / cols ) * cols ))
+     [[ ${string:0:$rows} ]] && printf "%s\n" "${string:0:$rows}"
+     space=$(( ( rows + cols ) - length ))
+  }
+  colsrowcalc
+
+  while kill -0 $! 2>/dev/null; do
         for v in '|' '/' '-' '\' '|' '/' '-' '\' ; do
-             sleep 0.1 ; printf "Scanning for sites in environment <$src_environment> using <$uripath>. Total $(tail -1 "$sitesnumfile") sites left %s\r" "$v"
+            string="Scanning for sites in environment <$src_environment> using <$uripath>. Total $(tail -1 "$sitesnumfile") sites left"
+            if (( length != (${#string} + 2) )); then
+                 colsrowcalc
+            fi
+            sleep 0.1 ; printf "%s%${space}s\r" "${string:$rows} $v"
         done
- done
- printf "%${COLUMNS:-80}s\r" ""
+  done
+  printf "%$(tput cols)s\r"
 }
 
 if [[ ! ${src_environment} ]] ; then

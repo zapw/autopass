@@ -1,4 +1,4 @@
-update empty terminal emulator code to handle SIGWINCH and update COLUMNS value 
+update empty terminal emulator code to handle SIGWINCH and update COLUMNS value and tput cols 
 http://www.cons.org/cracauer/sigint.html
 see reverse/forward Proxy in ssh maybe use shell redirect to tcp port or socat to rediect tcp to stdin from rsync -server  run it localy then as root rsync client from remote
 http://serverfault.com/questions/565083/rsync-over-active-ssh-connection
