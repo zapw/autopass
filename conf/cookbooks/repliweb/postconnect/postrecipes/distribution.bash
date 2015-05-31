@@ -3,7 +3,7 @@
 shopt -s extglob
 
 exec 6>&1
-declare -A domainsitename domainsvnpath umatchedsum prev_platform new_platform wordpress replicenter=([integration]="" [qa]="")
+declare -A domainsitename domainsvnpath umatchedsum prev_platform new_platform wordpress
 platform_xpath="/lists/list/entry[@kind='dir']/name/text()"
 wordpress_xpath="/lists/list/entry[@kind='dir']/name[starts-with(text(),'WP-') or starts-with(text(),'WP_')]/text()"
 
@@ -187,7 +187,7 @@ if (( "${#umatchedsum[@]}" )) && [[ $plat || $spwl ]]; then
      resolve_umatchedsum
 fi
 
-printf "%${COLUMNS:-80}s\r\n"
+printf "%${COLUMNS:-$(tput cols)}s\r\n"
 for key in "${!domainsvnpath[@]}"; do
     printf "%s\n" "domain:path <${domainsvnpath[$key]}>:<${key%@(${pltchksumfile}|${wpchksumfile})}>"
 done
@@ -199,11 +199,33 @@ if [[ ${umatchedsum[@]} ]]; then
      done
 fi
 
-rootdomainregex="^([^.]+\.)*([^.]+\.[^.]+)$"
-#for key in "${!domainsvnpath[@]}"; do
-#    tag=${domainsvnpath[$key]%%,*}
-#    [[ $tag = $rootdomainregex ]] && rootdomain=${BASH_REMATCH[2]}
-    #r1 submit -center="${replicenter[integration]}" -center_user="$repliwebuser" @<(printf -vpass %q "$repliwebpassword" ;printf %s "-center_password=$pass") -type=distribution -source_directory= -notree_recurse -target_directory= -name= -tags=\"tag1, tag2\\sub_tag2, tag3.sub_tag3, . . .\"
-#    printf "%s\n" "domain:path <${domainsvnpath[$key]}>:<$key>"
-#done
-#printf "\n"
+#rootdomainregex="^([^.]+\.)*([^.]+\.[^.]+)$"
+#[[ $tag = $rootdomainregex ]] && rootdomain=${BASH_REMATCH[2]}
+
+for key in "${!domainsvnpath[@]}"; do
+     fullsvnpath=${key%@(${pltchksumfile}|${wpchksumfile})}
+     domain=($(awk -vvar='spotplatform\\.' -F, '{ for (f=1 ; f <= NF ; f++ ) if ( $f ~ var ) print $f }' <<<"${domainsvnpath[$key]}"))
+     if (( ${#domain[@]} > 1 )); then
+          echo "More than one spotplatform. domain found ${domain[@]}"
+          exit 1
+     elif [[ ! ${domain[@]} ]]; then
+              continue
+     fi
+     rootdomain=${domain#*.}
+     rootdletter=${rootdomain:0:1}
+     #for center in "${replicenter[@]}"; do 
+     for center in "lab1"; do 
+         deletejobs=($(r1 show -center="$center" -center_user=root @/home/marceloe/credentials -tags='"'$rootdletter'\\'$rootdomain'\\sp"' | 
+		awk '$1 == "Distribution" {print $3}'))
+         for jobid in "${deletejobs[@]}"; do 
+             echo "deleting jobs under tag: $rootdletter\\$rootdomain\sp"
+             r1 delete -center="$center" -center_user=root @/home/marceloe/credentials -job="$jobid" -noconfirm
+         done
+     done
+     #echo "Submitting jobs for domain $domain to ${replicenter[intgr]}" with tag $rootdletter\\$rootdomain\sp"
+     echo "Submitting jobs for domain $domain to lab1 with tag $rootdletter\\$rootdomain\sp"
+     r1 submit -center="lab1" -center_user=root @/home/marceloe/credentials -in_template="${template[intgr]}" -source_directory="\"/data/spotoption/$domain\""  -target_directory="\"/data/spotoption/$domain\"" -name="\"$domain\"" -tags='"'$rootdletter', '$rootdletter'\\'$rootdomain', '$rootdletter'\\'$rootdomain'\\sp"' -pre_center_command='/root/scripts/vhost-create.sh' -pre_center_parameters="\"$domain $fullsvnpath $intgrvhostdir\"" "lab1"
+     #r1 submit -center="${replicenter[intgr]}" -center_user=root @/home/marceloe/credentials -in_template="${template[intgr]}" -source_directory="\"/data/spotoption/$domain\""  -target_directory="\"/data/spotoption/$domain\"" -name="\"$domain\"" -tags='"'$rootdletter', '$rootdletter'\\'$rootdomain', '$rootdletter'\\'$rootdomain'\\sp"' -pre_center_command='/root/scripts/vhost-create.sh' -pre_center_parameters="\"$domain $fullsvnpath $intgrvhostdir\"" "${replicenter[intgr]}" 
+     #echo "Submitting jobs for domain $domain to ${replicenter[qa]}" with tag $rootdletter\\$rootdomain\sp"
+     #r1 submit -center=${replicenter[qa]} -center_user=root @/home/marceloe/credentials -in_template="${template[qa]}" -source_directory="\"/data/spotoption/$domain\""  -target_directory="\"/data/spotoption/$domain\"" -name="\"$domain\"" -tags='"'$rootdletter', '$rootdletter'\\'$rootdomain', '$rootdletter'\\'$rootdomain'\\sp"' "${replicenter[qa]}"
+done
