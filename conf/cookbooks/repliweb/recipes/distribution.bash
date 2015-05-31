@@ -80,6 +80,7 @@ fi
 
 sitesnumfile=$(mktemp)
 sitesnumlckfile=$(mktemp)
+rm "$sitesnumlckfile"
 echo "${#sites[@]}" >$sitesnumfile
 tmp_sites=("${!sites[@]}")
 SECONDS=
