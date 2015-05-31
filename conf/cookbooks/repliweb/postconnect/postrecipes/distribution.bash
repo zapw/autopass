@@ -222,7 +222,7 @@ for key in "${!domainsvnpath[@]}"; do
      rootdomain=${domain#*.}
      rootdletter=${rootdomain:0:1}
      for center in "${replicenter[@]}"; do 
-         deletejobs=($(r1 show -center="$center" -center_user=root "@$passfile" -tags='"'$rootdletter'\\'$rootdomain'\\sp"' | 
+         deletejobs=($(r1 show -center="$center" -center_user=root "@$passfile" -name="\"$domain\"" | 
 		awk '$1 == "Distribution" {print $3}'))
          [[ "${deletejobs[@]}" ]] && echo "deleting jobs under tag: $rootdletter\\$rootdomain\sp in CENTER: $center"
          for jobid in "${deletejobs[@]}"; do 
