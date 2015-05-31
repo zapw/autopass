@@ -2,7 +2,7 @@
 bashversion
 
 declare -A DocumentRoot type name filesite allsites csum
-export src_environment curl_contimeout curl_maxtime sitesnumfile
+export src_environment curl_contimeout curl_maxtime sitesnumfile sitesnumlckfile
 
 exitfun () {
  rm $sitesnumfile 2>/dev/null
@@ -79,18 +79,25 @@ else
 fi
 
 sitesnumfile=$(mktemp)
+sitesnumlckfile=$(mktemp)
 echo "${#sites[@]}" >$sitesnumfile
 tmp_sites=("${!sites[@]}")
 SECONDS=
 domains=(
      $(xargs -n1 -P"${max_curl_procs}" /bin/bash -c 'read -r line < <(curl -s --connect-timeout "$curl_contimeout" --max-time "$curl_maxtime" -H"Host: ${0%%./*}" "http://$0" 2>/dev/null)
-             read -r num < <(tail -1 $sitesnumfile)
-	     echo $((--num)) >>"$sitesnumfile"
-             shopt -s extglob
-	     host=${line%%@( |<|>|-)*}
-	     if [[ $src_environment = "${host#*.}" ]] ; then
-                  echo "${0%%./*}"
-	     fi' <<<"${tmp_sites[@]/%/./${uripath#/}}" & banner >&6)
+            set -C
+            while ! 2>/dev/null >$sitesnumlckfile; then
+                  sleep 0.1
+            done        
+
+            read -r num <$sitesnumfile
+	    echo $((--num)) >"$sitesnumfile"
+            shopt -s extglob
+	    host=${line%%@( |<|>|-)*}
+	    if [[ $src_environment = "${host#*.}" ]] ; then
+                 echo "${0%%./*}"
+	    fi
+            rm $sitesnumlckfile' <<<"${tmp_sites[@]/%/./${uripath#/}}" & banner >&6)
 )
 seconds=$SECONDS
 if (( seconds < 60 )); then

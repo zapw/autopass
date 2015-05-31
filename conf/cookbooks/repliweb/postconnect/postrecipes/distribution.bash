@@ -209,6 +209,10 @@ fi
 #rootdomainregex="^([^.]+\.)*([^.]+\.[^.]+)$"
 #[[ $tag = $rootdomainregex ]] && rootdomain=${BASH_REMATCH[2]}
 
+if [[ $skipjobsubmit = @(true|on|1) ]]; then
+     exit 0
+fi
+
 for key in "${!domainsvnpath[@]}"; do
      fullsvnpath=${key%@(${pltchksumfile}|${wpchksumfile})}
      domain=($(awk -vvar='spotplatform\\.' -F, '{ for (f=1 ; f <= NF ; f++ ) if ( $f ~ var ) print $f }' <<<"${domainsvnpath[$key]}"))
