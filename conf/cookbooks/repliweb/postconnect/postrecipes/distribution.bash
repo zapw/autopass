@@ -11,6 +11,13 @@ printf -vfilesrc %q "$filename"
 ssh -o ControlPath="$tmpdir/$server-$port-$user" -o CheckHostIP=no -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no "$server" "cat $filesrc;rm $filesrc" >"$tmpdir/$filesrc"
 source "$tmpdir/$filesrc"
 
+edgelist=$(for edge in "${edges[@]}"; do printf "%q," "$edge" ; done)
+edgelist=${edgelist%,}
+
+printf "%q" "-center_password=$repliwebpassword" >"$tmpdir/credentials"
+chmod 600 "$tmpdir/credentials"
+passfile="$tmpdir/credentials"
+
 pltchksumfile=${pltchksumfile#/}
 wpchksumfile=${wpchksumfile#/}
 
@@ -211,21 +218,36 @@ for key in "${!domainsvnpath[@]}"; do
      elif [[ ! ${domain[@]} ]]; then
               continue
      fi
+
      rootdomain=${domain#*.}
      rootdletter=${rootdomain:0:1}
-     #for center in "${replicenter[@]}"; do 
-     for center in "lab1"; do 
-         deletejobs=($(r1 show -center="$center" -center_user=root @/home/marceloe/credentials -tags='"'$rootdletter'\\'$rootdomain'\\sp"' | 
+     for center in "${replicenter[@]}"; do 
+         deletejobs=($(r1 show -center="$center" -center_user=root "@$passfile" -tags='"'$rootdletter'\\'$rootdomain'\\sp"' | 
 		awk '$1 == "Distribution" {print $3}'))
+         [[ "${deletejobs[@]}" ]] && echo "deleting jobs under tag: $rootdletter\\$rootdomain\sp in CENTER: $center"
          for jobid in "${deletejobs[@]}"; do 
-             echo "deleting jobs under tag: $rootdletter\\$rootdomain\sp"
-             r1 delete -center="$center" -center_user=root @/home/marceloe/credentials -job="$jobid" -noconfirm
+             r1 delete -center="$center" -center_user=root "@$passfile" -job="$jobid" -noconfirm
          done
      done
-     #echo "Submitting jobs for domain $domain to ${replicenter[intgr]}" with tag $rootdletter\\$rootdomain\sp"
-     echo "Submitting jobs for domain $domain to lab1 with tag $rootdletter\\$rootdomain\sp"
-     r1 submit -center="lab1" -center_user=root @/home/marceloe/credentials -in_template="${template[intgr]}" -source_directory="\"/data/spotoption/$domain\""  -target_directory="\"/data/spotoption/$domain\"" -name="\"$domain\"" -tags='"'$rootdletter', '$rootdletter'\\'$rootdomain', '$rootdletter'\\'$rootdomain'\\sp"' -pre_center_command='/root/scripts/vhost-create.sh' -pre_center_parameters="\"$domain $fullsvnpath $intgrvhostdir\"" "lab1"
-     #r1 submit -center="${replicenter[intgr]}" -center_user=root @/home/marceloe/credentials -in_template="${template[intgr]}" -source_directory="\"/data/spotoption/$domain\""  -target_directory="\"/data/spotoption/$domain\"" -name="\"$domain\"" -tags='"'$rootdletter', '$rootdletter'\\'$rootdomain', '$rootdletter'\\'$rootdomain'\\sp"' -pre_center_command='/root/scripts/vhost-create.sh' -pre_center_parameters="\"$domain $fullsvnpath $intgrvhostdir\"" "${replicenter[intgr]}" 
-     #echo "Submitting jobs for domain $domain to ${replicenter[qa]}" with tag $rootdletter\\$rootdomain\sp"
-     #r1 submit -center=${replicenter[qa]} -center_user=root @/home/marceloe/credentials -in_template="${template[qa]}" -source_directory="\"/data/spotoption/$domain\""  -target_directory="\"/data/spotoption/$domain\"" -name="\"$domain\"" -tags='"'$rootdletter', '$rootdletter'\\'$rootdomain', '$rootdletter'\\'$rootdomain'\\sp"' "${replicenter[qa]}"
+
+     echo "Submitting jobs for domain $domain to CENTER: ${replicenter[intgr]} with tag $rootdletter\\$rootdomain\sp"
+     output=$(r1 submit -center="${replicenter[intgr]}" -center_user=root "@$passfile" -in_template="${template[intgr]}" -source_directory="\"/data/spotoption/$domain\""  -target_directory="\"/data/spotoption/$domain\"" -name="\"$domain\"" -tags='"'$rootdletter', '$rootdletter'\\'$rootdomain', '$rootdletter'\\'$rootdomain'\\sp"' -pre_center_command='/root/scripts/vhost-create.sh' -pre_center_parameters="\"$domain $fullsvnpath $intgrvhostdir\"" "${replicenter[qa]}")
+     echo "$output"
+
+     jobid=$(sed -rn 's/.+ job <([[:digit:]]+)> successfully submitted/\1/p' <<<"$output")
+     if [[ $jobid ]]; then
+          echo "Submitting on demand job for domain $domain to CENTER ${replicenter[intgr]} with tag: $rootdletter\\$rootdomain\sp"
+          for (( i=0; i<30; i++)); do
+                if ! r1 show -job="$jobid" -center="${replicenter[intgr]}" -center_user=root "@$passfile" | 
+			awk '$1 == "State" && $3 == "Scheduled" {code++} END { exit !code}'; then
+                     sleep 1
+                else
+                    r1 demand_submit -job="$jobid" -center="${replicenter[intgr]}" -center_user=root "@$passfile" -noconfirm
+                    break
+                fi
+          done
+     fi
+
+     echo "Submitting job for domain $domain to CENTER: ${replicenter[qa]} with tag $rootdletter\\$rootdomain\sp"
+     r1 submit -center=${replicenter[qa]} -center_user=root @$passfile -in_template="${template[qa]}" -source_directory="\"/data/spotoption/$domain\""  -target_directory="\"/data/spotoption/$domain\"" -name="\"$domain\"" -tags='"'$rootdletter', '$rootdletter'\\'$rootdomain', '$rootdletter'\\'$rootdomain'\\sp"' "$edgelist"
 done

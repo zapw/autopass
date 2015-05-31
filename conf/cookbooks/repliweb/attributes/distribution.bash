@@ -1,8 +1,9 @@
-declare -A template=([intgr]= [qa]=) replicenter=([intgr]="" [qa]="")
+declare -A template=([intgr]= [qa]=) replicenter=([intgr]="" [qa]="") centeruser=([intgr]="" [qa]="")
 src_environment=""
 # sites=("all") will create jobs for all sites
 # sites=("domain.com" "foobar.com" "stream.example.com") will create jobs for only these sites.
 sites=("")
+edges=("")
 filename='.sites'
 uripath="serverid"
 max_curl_procs="60"
