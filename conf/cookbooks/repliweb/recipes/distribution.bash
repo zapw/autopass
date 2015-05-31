@@ -86,7 +86,7 @@ SECONDS=
 domains=(
      $(xargs -n1 -P"${max_curl_procs}" /bin/bash -c 'read -r line < <(curl -s --connect-timeout "$curl_contimeout" --max-time "$curl_maxtime" -H"Host: ${0%%./*}" "http://$0" 2>/dev/null)
             set -C
-            while ! 2>/dev/null >$sitesnumlckfile; then
+            while ! 2>/dev/null >$sitesnumlckfile; do
                   sleep 0.1
             done        
 
