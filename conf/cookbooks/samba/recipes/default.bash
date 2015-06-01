@@ -1,10 +1,6 @@
 #!/bin/bash
 set -e
 
-echo "$mkhomedir" >"/usr/local/sbin/mkhomedir"
-echo "$smb_conf" >"/etc/samba/smb.conf"
-chmod +x /usr/local/sbin/mkhomedir
-
 if [[ $os_rel = "redhat" ]] ; then
     if (( os_relver == 7 ))  ; then
 	package_install samba
@@ -18,3 +14,7 @@ if [[ $os_rel = "redhat" ]] ; then
 	  service nmb restart
     fi
 fi
+
+echo "$mkhomedir" >"/usr/local/sbin/mkhomedir"
+echo "$smb_conf" >"/etc/samba/smb.conf"
+chmod +x /usr/local/sbin/mkhomedir
