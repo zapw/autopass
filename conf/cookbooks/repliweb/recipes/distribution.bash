@@ -78,26 +78,50 @@ else
      done
 fi
 
+
+
 sitesnumfile=$(mktemp)
 sitesnumlckfile=$(mktemp)
 rm "$sitesnumlckfile"
-echo "${#sites[@]}" >$sitesnumfile
+echo "${#sites[@]} 0 0 0 0" >"$sitesnumfile"
 tmp_sites=("${!sites[@]}")
+
+exec 7> >(
+            while ! ( set -C; 2>/dev/null >"$sitesnumlckfile" ); do
+                  sleep 0.1
+            done
+            read -r sitesnum lookup resolv connect timeout <"$sitesnumfile"
+            read -r line 
+	    case $line in
+			*"(6) name lookup timed out")
+                             echo "$sitesnum $((++lookup)) $resolv $connect $timeout" >$sitesnumfile
+			     ;;
+			*"(6) Couldn't resolve host")
+			     echo "$sitesnum $lookup $((++resolv)) $connect $timeout" >$sitesnumfile
+			     ;;
+			*"(7) couldn't connect to host")
+			     echo "$sitesnum $lookup $resolv $((++connect)) $timeout" >$sitesnumfile
+			     ;;
+			*"(28) Operation timed out after")
+			     echo "$sitesnum $lookup $resolv $connect $((++timeout))" >$sitesnumfile
+			     ;;
+	    esac
+	    rm "$sitesnumlckfile"
+          )
 SECONDS=
 domains=(
-     $(xargs -n1 -P"${max_curl_procs}" /bin/bash -c 'read -r line < <(curl -s --connect-timeout "$curl_contimeout" --max-time "$curl_maxtime" -H"Host: ${0%%./*}" "http://$0" 2>/dev/null)
+     $(xargs -n1 -P"${max_curl_procs}" /bin/bash -c 'read -r line < <(curl --connect-timeout "$curl_contimeout" --max-time "$curl_maxtime" -H"Host: ${0%%./*}" "http://$0" 2>&7)
             while ! ( set -C; 2>/dev/null >$sitesnumlckfile ); do
                   sleep 0.1
             done        
-
-            read -r num <$sitesnumfile
+            read -r num <"$sitesnumfile"
 	    echo $((--num)) >"$sitesnumfile"
             shopt -s extglob
 	    host=${line%%@( |<|>|-)*}
 	    if [[ $src_environment = "${host#*.}" ]] ; then
                  echo "${0%%./*}"
 	    fi
-            rm $sitesnumlckfile' <<<"${tmp_sites[@]/%/./${uripath#/}}" & banner >&6)
+            rm "$sitesnumlckfile"' <<<"${tmp_sites[@]/%/./${uripath#/}}" & banner >&6)
 )
 seconds=$SECONDS
 if (( seconds < 60 )); then
@@ -107,6 +131,9 @@ elif (( seconds >= 60 )); then
        seconds=$(( seconds % 60 ))
 fi
 printf "scan time %s minutes %s seconds.\n" "$min" "$seconds"
+read -r sitesnum lookup resolv connect timeout <"$sitesnumfile"
+printf "%s\n" "Name lookup timed out: $lookup" "Couldn't resolve host: $resolv" "Couldn't connect to host: $connect" "Operation timed out after: $timeout"
+exec 7>&-
 rm "$sitesnumfile"
 
 sedversion=($(sed --version  | awk  '{gsub(/\./," ",$NF);print $NF ; exit}'))

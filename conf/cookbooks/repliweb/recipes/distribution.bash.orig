@@ -81,7 +81,7 @@ fi
 sitesnumfile=$(mktemp)
 sitesnumlckfile=$(mktemp)
 rm "$sitesnumlckfile"
-echo "${#sites[@]} 0 0 0 0" >$sitesnumfile
+echo "${#sites[@]}" >$sitesnumfile
 tmp_sites=("${!sites[@]}")
 SECONDS=
 domains=(
