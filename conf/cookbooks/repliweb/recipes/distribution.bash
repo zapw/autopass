@@ -1,4 +1,4 @@
-#!/bin/env bash -x
+#!/bin/env bash
 bashversion
 
 declare -A DocumentRoot type name filesite allsites csum
@@ -97,7 +97,6 @@ fileandlock () {
    done
 }
 setuplck () {
-  set -x 
   local tmpvar num
   eval tmpvar='"${'"${1}"'lck}"'
   while ! ( set -C; 2>/dev/null >"$tmpvar" ); do
@@ -133,7 +132,6 @@ while [[ -p "$pipefile" ]]; do
                     esac
 		done
 done &
-sleep 10
 
 if sitesnumfile=$(mktemp); then
     echo "${#sites[@]}" >"$sitesnumfile"
@@ -148,7 +146,7 @@ fi
 tmp_sites=("${!sites[@]}")
 SECONDS=
 domains=(
-     $(xargs -n1 -P"${max_curl_procs}" /bin/bash -c 'read -r line < <(curl --connect-timeout "$curl_contimeout" --max-time "$curl_maxtime" -H"Host: ${0%%./*}" "http://$0" 2>"$pipefile")
+     $(xargs -n1 -P"${max_curl_procs}" /bin/bash -c 'read -r line < <(stdbuf -eL curl -sS --connect-timeout "$curl_contimeout" --max-time "$curl_maxtime" -H"Host: ${0%%./*}" "http://$0" 2>"$pipefile")
             while ! ( set -C; 2>/dev/null >$sitesnumlckfile ); do
                   sleep 0.1
             done        
