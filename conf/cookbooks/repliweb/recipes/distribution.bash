@@ -1,11 +1,11 @@
 #!/bin/env bash
 bashversion
 
-#type -P stdbuf >/dev/null
-#if (( $? )); then
-#     echo 'stdbuf missing, try re uploading bash4 recipe.'
-#     exit 1
-#fi
+type -P stdbuf >/dev/null
+if (( $? )); then
+     echo 'stdbuf missing, try re uploading bash4 recipe.'
+     exit 1
+fi
 
 declare -A DocumentRoot type name filesite allsites csum
 export src_environment curl_contimeout curl_maxtime sitesnumfile sitesnumlckfile pipefile
@@ -152,8 +152,7 @@ fi
 tmp_sites=("${!sites[@]}")
 SECONDS=
 domains=(
-     #$(xargs -n1 -P"${max_curl_procs}" /bin/bash -c 'read -r line < <(stdbuf -eL curl -sS --connect-timeout "$curl_contimeout" --max-time "$curl_maxtime" -H"Host: ${0%%./*}" "http://$0" 2>"$pipefile")
-     $(xargs -n1 -P"${max_curl_procs}" /bin/bash -c 'read -r line < <(curl -sS --buffer --connect-timeout "$curl_contimeout" --max-time "$curl_maxtime" -H"Host: ${0%%./*}" "http://$0" 2>"$pipefile")
+     $(xargs -n1 -P"${max_curl_procs}" /bin/bash -c 'read -r line < <(stdbuf -eL curl -sS --connect-timeout "$curl_contimeout" --max-time "$curl_maxtime" -H"Host: ${0%%./*}" "http://$0" 2>"$pipefile")
             while ! ( set -C; 2>/dev/null >$sitesnumlckfile ); do
                   sleep 0.1
             done        
