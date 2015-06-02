@@ -1,6 +1,12 @@
 #!/bin/env bash
 bashversion
 
+type -P stdbuf >/dev/null
+if (( $? )); then
+     echo 'stdbuf missing, try re uploading bash4 recipe.'
+     exit 1
+fi
+
 declare -A DocumentRoot type name filesite allsites csum
 export src_environment curl_contimeout curl_maxtime sitesnumfile sitesnumlckfile pipefile
 
