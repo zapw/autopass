@@ -2,7 +2,7 @@
 bashversion
 
 declare -A DocumentRoot type name filesite allsites csum
-export src_environment curl_contimeout curl_maxtime sitesnumfile sitesnumlckfile
+export src_environment curl_contimeout curl_maxtime sitesnumfile sitesnumlckfile pipefile
 
 exitfun () {
  rm $sitesnumfile 2>/dev/null
@@ -15,7 +15,7 @@ banner () {
   printf "%$(tput cols)s\r"
 
   colsrowcalc () {
-     string="Scanning for sites in environment <$src_environment> using <$uripath>. Total $(tail -1 "$sitesnumfile") sites left"
+     string="Scanning for sites in environment <$src_environment> using <$uripath>. Total $(<"$sitesnumfile") sites left"
      length=$(( ${#string} + 2 ))
      cols=$(tput cols)
      rows=$(( ( length / cols ) * cols ))
@@ -26,7 +26,7 @@ banner () {
 
   while kill -0 $! 2>/dev/null; do
         for v in '|' '/' '-' '\' '|' '/' '-' '\' ; do
-            string="Scanning for sites in environment <$src_environment> using <$uripath>. Total $(tail -1 "$sitesnumfile") sites left"
+            string="Scanning for sites in environment <$src_environment> using <$uripath>. Total $(<"$sitesnumfile") sites left"
             if (( length != (${#string} + 2) )); then
                  colsrowcalc
             fi
@@ -78,44 +78,77 @@ else
      done
 fi
 
+if pipefile=$(mktemp); then
+    rm $pipefile
+    mkfifo $pipefile
+else
+    exit 1
+fi
 
+fileandlock () {
+   local tmplck i
+   for i; do
+          if eval "$i"=$(mktemp) && eval "${i}lck"=$(mktemp); then
+	       echo 0 >"${!i}"
+               eval rm '${'"${i}"'lck}'
+          else
+               exit 1
+          fi
+   done
+}
+setuplck () {
+  local tmpvar num
+  eval tmpvar='"${'"${1}"'lck}"'
+  while ! ( set -C; 2>/dev/null >"$tmpvar" ); do
+        sleep 0.1
+  done
+  read -r num <"${!1}"
+  echo "$((++num))" >"${!1}"
+  rm "$tmpvar"
+}
 
-sitesnumfile=$(mktemp)
-sitesnumlckfile=$(mktemp)
-rm "$sitesnumlckfile"
-echo "${#sites[@]} 0 0 0 0" >"$sitesnumfile"
+fileandlock lookup resolv connect timeout
+while [[ -p "$pipefile" ]]; do
+		read -r line
+                case $line in
+                            *"(6) name lookup timed out")
+				 setuplck lookup
+                                 ;;
+                            *"(6) Couldnt resolve host")
+				 setuplck resolv
+                                 ;;
+                            *"(7) couldnt connect to host")
+				 setuplck connect
+                                 ;;
+                            *"(28) Operation timed out")
+				 setuplck timeout
+				 ;;
+			    terminate)
+				  rm "$pipefile"
+				  break 2
+                                 ;;
+                esac
+done <"$pipefile" &
+
+if sitesnumfile=$(mktemp); then
+    echo "${#sites[@]}" >"$sitesnumfile"
+else
+    exit 1
+fi
+if sitesnumlckfile=$(mktemp); then
+    rm "$sitesnumlckfile"
+else
+    exit 1
+fi
 tmp_sites=("${!sites[@]}")
-
-exec 7> >(
-            while ! ( set -C; 2>/dev/null >"$sitesnumlckfile" ); do
-                  sleep 0.1
-            done
-            read -r sitesnum lookup resolv connect timeout <"$sitesnumfile"
-            read -r line 
-	    case $line in
-			*"(6) name lookup timed out")
-                             echo "$sitesnum $((++lookup)) $resolv $connect $timeout" >$sitesnumfile
-			     ;;
-			*"(6) Couldn't resolve host")
-			     echo "$sitesnum $lookup $((++resolv)) $connect $timeout" >$sitesnumfile
-			     ;;
-			*"(7) couldn't connect to host")
-			     echo "$sitesnum $lookup $resolv $((++connect)) $timeout" >$sitesnumfile
-			     ;;
-			*"(28) Operation timed out after")
-			     echo "$sitesnum $lookup $resolv $connect $((++timeout))" >$sitesnumfile
-			     ;;
-	    esac
-	    rm "$sitesnumlckfile"
-          )
 SECONDS=
 domains=(
-     $(xargs -n1 -P"${max_curl_procs}" /bin/bash -c 'read -r line < <(curl --connect-timeout "$curl_contimeout" --max-time "$curl_maxtime" -H"Host: ${0%%./*}" "http://$0" 2>&7)
+     $(xargs -n1 -P"${max_curl_procs}" /bin/bash -c 'read -r line < <(curl --connect-timeout "$curl_contimeout" --max-time "$curl_maxtime" -H"Host: ${0%%./*}" "http://$0" 2>"$pipefile")
             while ! ( set -C; 2>/dev/null >$sitesnumlckfile ); do
                   sleep 0.1
             done        
             read -r num <"$sitesnumfile"
-	    echo $((--num)) >"$sitesnumfile"
+	    echo "$((--num))" >"$sitesnumfile"
             shopt -s extglob
 	    host=${line%%@( |<|>|-)*}
 	    if [[ $src_environment = "${host#*.}" ]] ; then
@@ -131,10 +164,9 @@ elif (( seconds >= 60 )); then
        seconds=$(( seconds % 60 ))
 fi
 printf "scan time %s minutes %s seconds.\n" "$min" "$seconds"
-read -r sitesnum lookup resolv connect timeout <"$sitesnumfile"
-printf "%s\n" "Name lookup timed out: $lookup" "Couldn't resolve host: $resolv" "Couldn't connect to host: $connect" "Operation timed out after: $timeout"
-exec 7>&-
-rm "$sitesnumfile"
+printf "%s\n" "Name lookup timed out: $(<"$lookup")" "Couldn't resolve host: $(<"$resolv")" "Couldn't connect to host: $(<"$connect")" "Operation timed out: $(<"$timeout")"
+rm "$sitesnumfile" "$lookup" "$resolv" "$connect" "$timeout"
+echo "terminate" >"$pipefile"
 
 sedversion=($(sed --version  | awk  '{gsub(/\./," ",$NF);print $NF ; exit}'))
 
