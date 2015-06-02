@@ -1,4 +1,4 @@
-#!/bin/env bash
+#!/bin/env bash -x
 bashversion
 
 declare -A DocumentRoot type name filesite allsites csum
@@ -86,7 +86,7 @@ else
 fi
 
 fileandlock () {
-   local tmplck i
+   local i
    for i; do
           if eval "$i"=$(mktemp) && eval "${i}lck"=$(mktemp); then
 	       echo 0 >"${!i}"
@@ -97,38 +97,43 @@ fileandlock () {
    done
 }
 setuplck () {
+  set -x 
   local tmpvar num
   eval tmpvar='"${'"${1}"'lck}"'
   while ! ( set -C; 2>/dev/null >"$tmpvar" ); do
         sleep 0.1
   done
   read -r num <"${!1}"
-  echo "$((++num))" >"${!1}"
+  printf "%s" $((++num)) >"${!1}"
   rm "$tmpvar"
 }
 
 fileandlock lookup resolv connect timeout
 while [[ -p "$pipefile" ]]; do
-		read -r line <"$pipefile"
-                case $line in
-                            *"(6) name lookup timed out")
+		IFS= read -d '' -r line <"$pipefile"
+		IFS=$'\n'
+		for i in $line; do
+                    case $i in
+                            *"(6)"*lookup*)
 				 setuplck lookup
                                  ;;
-                            *"(6) Couldnt resolve host")
+                            *"(6)"*resolve*)
 				 setuplck resolv
                                  ;;
-                            *"(7) couldnt connect to host")
+                            *"(7)"*connect*)
 				 setuplck connect
                                  ;;
-                            *"(28) Operation timed out")
+                            *"(28)"*timed*)
 				 setuplck timeout
 				 ;;
-			    terminate)
+			    *terminate*)
 				  rm "$pipefile"
-				  break 2
+				  break 3
                                  ;;
-                esac
+                    esac
+		done
 done &
+sleep 10
 
 if sitesnumfile=$(mktemp); then
     echo "${#sites[@]}" >"$sitesnumfile"
@@ -164,9 +169,10 @@ elif (( seconds >= 60 )); then
        seconds=$(( seconds % 60 ))
 fi
 printf "scan time %s minutes %s seconds.\n" "$min" "$seconds"
+echo "terminate" >"$pipefile"
+wait
 printf "%s\n" "Name lookup timed out: $(<"$lookup")" "Couldn't resolve host: $(<"$resolv")" "Couldn't connect to host: $(<"$connect")" "Operation timed out: $(<"$timeout")"
 rm "$sitesnumfile" "$lookup" "$resolv" "$connect" "$timeout"
-echo "terminate" >"$pipefile"
 
 sedversion=($(sed --version  | awk  '{gsub(/\./," ",$NF);print $NF ; exit}'))
 
