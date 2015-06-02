@@ -109,7 +109,7 @@ setuplck () {
 
 fileandlock lookup resolv connect timeout
 while [[ -p "$pipefile" ]]; do
-		read -r line
+		read -r line <"$pipefile"
                 case $line in
                             *"(6) name lookup timed out")
 				 setuplck lookup
@@ -128,7 +128,7 @@ while [[ -p "$pipefile" ]]; do
 				  break 2
                                  ;;
                 esac
-done <"$pipefile" &
+done &
 
 if sitesnumfile=$(mktemp); then
     echo "${#sites[@]}" >"$sitesnumfile"
