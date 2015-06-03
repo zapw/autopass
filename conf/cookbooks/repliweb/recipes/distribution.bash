@@ -1,10 +1,12 @@
 #!/bin/env bash
 bashversion
 
-type -P stdbuf >/dev/null
-if (( $? )); then
-     echo 'stdbuf missing, try re uploading bash4 recipe.'
-     exit 1
+if [[ $os_relver = 5 ]]; then
+     type -P stdbuf libstdbuf.so >/dev/null
+     if (( $? )); then
+          echo 'stdbuf/libstdbuf.so missing, try re uploading bash4 recipe.'
+          exit 1
+     fi
 fi
 
 declare -A DocumentRoot type name filesite allsites csum
