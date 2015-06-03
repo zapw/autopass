@@ -1,5 +1,5 @@
 declare -A template=([intgr]= [qa]=) replicenter=([intgr]="" [qa]="") centeruser=([intgr]="" [qa]="")
-src_environment=""
+src_environment=()
 # sites=("all") will create jobs for all sites
 # sites=("domain.com" "foobar.com" "stream.example.com") will create jobs for only these sites.
 sites=("")
