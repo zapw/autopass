@@ -10,6 +10,8 @@ fi
 declare -A DocumentRoot type name filesite allsites csum
 export srcenvironment curl_contimeout curl_maxtime sitesnumfile sitesnumlckfile pipefile
 
+uripath=${uripath#/}
+
 exitfun () {
  rm $sitesnumfile 2>/dev/null
 }
@@ -21,7 +23,7 @@ banner () {
   printf "%$(tput cols)s\r"
 
   colsrowcalc () {
-     string="Scanning for sites matching <$decap_srcenvironment> using <$uripath>. Total $(<"$sitesnumfile") sites left"
+     string="Scanning for sites matching <$decap_srcenvironment> using </$uripath>. Total $(<"$sitesnumfile") sites left"
      length=$(( ${#string} + 2 ))
      cols=$(tput cols)
      rows=$(( ( length / cols ) * cols ))
@@ -32,7 +34,7 @@ banner () {
 
   while kill -0 $! 2>/dev/null; do
         for v in '|' '/' '-' '\' '|' '/' '-' '\' ; do
-            string="Scanning for sites matching <$decap_srcenvironment> using <$uripath>. Total $(<"$sitesnumfile") sites left"
+            string="Scanning for sites matching <$decap_srcenvironment> using </$uripath>. Total $(<"$sitesnumfile") sites left"
             if (( length != (${#string} + 2) )); then
                  colsrowcalc
             fi
@@ -46,7 +48,7 @@ if [[ ! ${src_environment[@]} ]] ; then
      srcenvironment=$(hostname -f)
      decap_srcenvironment=${srcenvironment#*.}
      srcenvironment="@(${srcenvironment#*.})"
-     printf "\n%s\n%s\n" "Warning! <src_environment> not set" "using hostname's extracted domain name <$decap_srcenvironment> as string to match with <$uripath>"
+     printf "\n%s\n%s\n" "Warning! <src_environment> not set" "using hostname's extracted domain name <$decap_srcenvironment> as string to match with </$uripath>"
 else
     sIFS="$IFS"
     IFS=\|
