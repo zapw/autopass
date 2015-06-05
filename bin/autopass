@@ -2,7 +2,12 @@
 #the script uses 'empty' http://empty.sourceforge.net/. Apply included patch or use already included patched version.
 
 conntimeo=30
-{ [[ -r "$HOME/.autopass/config" ]] && confdir="$HOME/.autopass";} || confdir="/usr/local/etc/autopass"
+for conf in ./conf ../conf "$HOME"/.autopass /usr/local/etc/autopass; do
+    if [[ -r $conf/config ]]; then
+         confdir="$conf"
+         break
+    fi
+done
 runfilesdir="$confdir/runfiles"
 cookbookdir="$confdir/cookbooks"
 envdir="$confdir/environment"
