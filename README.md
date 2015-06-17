@@ -14,16 +14,16 @@ Directory structure:
 
 Description of directoires under conf/ :
 
-  conf/
-      config
-      cookbooks/
-                attributes
-                recipes
-      enabled
-      environment/
-                 default
-      perserver
-      roles
-      runfiles
-      servers
 
+     conf/
+          config
+          cookbooks/
+                   attributes
+                   recipes
+           enabled
+           environment/
+                      default
+           perserver
+           roles
+           runfiles
+           servers
