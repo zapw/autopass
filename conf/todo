@@ -54,3 +54,5 @@ devuser should have like sshfsuser only sftp access move both users creations to
 
 see what mod_security is doing phpmyadmin.conf
 
+use: env[cookbook,name]   to reference variables/arrays/functions from other cookbooks
+eval 
