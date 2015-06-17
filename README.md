@@ -1,7 +1,8 @@
 Tool for automating job execution on multiplie servers
 
 
-Directory structure
+Directory structure:
+
   autopass searches for file <config> under <conf> directory in the following order:
     "current working directory"/conf
     "current working directory"/../conf
@@ -10,7 +11,8 @@ Directory structure
     /usr/local/etc/autopass
 
 
-Description of directoires under conf/
+Description of directoires under conf/ :
+
   conf/
       config
       cookbooks/
