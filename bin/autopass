@@ -2,9 +2,12 @@
 #the script uses 'empty' http://empty.sourceforge.net/. Apply included patch or use already included patched version.
 
 conntimeo=30
-for conf in ./conf ../conf "$HOME"/.autopass /usr/local/etc/autopass; do
+conf1="$(readlink -enq "$0")"
+conf1="${conf1%/*/*}/conf"
+
+for conf in ./conf ../conf "$conf1" "$HOME"/.autopass /usr/local/etc/autopass; do
     if [[ -r $conf/config ]]; then
-         confdir="$conf"
+	 confdir=$(readlink -enq "$conf")
 	 echo "confdir set to <$confdir>"
          break
     fi
