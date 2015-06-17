@@ -5,9 +5,15 @@ conntimeo=30
 for conf in ./conf ../conf "$HOME"/.autopass /usr/local/etc/autopass; do
     if [[ -r $conf/config ]]; then
          confdir="$conf"
+	 echo "confdir set to <$confdir>"
          break
     fi
 done
+if [[ ! $confdir ]]; then
+	echo "confdir for $0 not found"
+	exit 1
+fi
+
 runfilesdir="$confdir/runfiles"
 cookbookdir="$confdir/cookbooks"
 envdir="$confdir/environment"
