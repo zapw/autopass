@@ -15,7 +15,6 @@ Directory structure:
 Description of directoires under conf/ :
 
   conf/
-
       config
       cookbooks/
                 attributes
