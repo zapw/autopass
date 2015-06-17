@@ -3,7 +3,7 @@ Tool for automating job execution on multiplie servers
 
 Directory structure:
 
-  autopass searches for file <config> under <conf> directory in the following order:
+ autopass searches for file config under conf directory in the following order:
 
     "current working directory"/conf
     "current working directory"/../conf
