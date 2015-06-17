@@ -8,10 +8,12 @@ conf1="${conf1%/*/*}/conf"
 for conf in ./conf ../conf "$conf1" "$HOME"/.autopass /usr/local/etc/autopass; do
     if [[ -r $conf/config ]]; then
 	 confdir=$(readlink -enq "$conf")
-	 echo "confdir set to <$confdir>"
          break
     fi
 done
+
+declare -r confdir
+
 if [[ ! $confdir ]]; then
 	echo "confdir for $0 not found"
 	exit 1
