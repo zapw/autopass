@@ -217,7 +217,7 @@ for key in "${!domainsvnpath[@]}"; do
      fullsvnpath=${key%@(${pltchksumfile}|${wpchksumfile})}
      domain=($(awk -vvar='spotplatform\\.' -F, '{ for (f=1 ; f <= NF ; f++ ) if ( $f ~ var ) print $f }' <<<"${domainsvnpath[$key]}"))
      if (( ${#domain[@]} > 1 )); then
-          echo "More than one spotplatform. domain found : ${domain[@]}"
+          echo "More than one site with a 'spotplatform.' domain found: ${domain[@]}"
 	  echo "skippking"
 	  continue
      elif [[ ! ${domain[@]} ]]; then
