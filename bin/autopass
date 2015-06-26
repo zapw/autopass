@@ -91,6 +91,7 @@ srflg=0
 loflg=0
 stflg=0
 defaultargs=([0]="-z" [1]="-O")
+skipcomment_and_empty='^([[:blank:]]*#|$)'
 
 declare -a password
 getpass() {
@@ -124,7 +125,6 @@ cleanup() {
 loadcookbookfromfile () {
   local cookbookfromfile recipefromfile element
   local -a array
-  skipcomment_and_empty='^[[:blank:]]*#'
 
   if [[ -f "$cookbookdir/$1/depends" ]]; then
        mapfile -t array <"$cookbookdir/$1/depends"
@@ -429,7 +429,7 @@ fi
 	    
 if (( ! ${#servers[@]} )) && [[ -f "$confdir/servers" ]] ; then
      while read -r server ; do 
-	    [[ $server =~ ^(#|$) ]] && continue 
+	    [[ $server =~ $skipcomment_and_empty ]] && continue 
 	    servers+=("$server") 
      done <"$confdir/servers"
 fi
