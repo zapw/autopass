@@ -460,6 +460,25 @@ for runfile in "${runlist[@]}" ; do
      fi
 done
 
+printf "\nServer list:\n\n" 
+
+for ((i = 0; i < ${#servers[@]}; i += 10)) ; do 
+    if ((i == 21 || i == 61)); then
+       printf "\n"
+    fi
+    for ((j = 0; j < 5 && i+j < ${#servers[@]}; j++)) ; do 
+	printf "   %-41s" "$((i+j))) ${servers[i+j]}"
+	if (( i+j+5 < ${#servers[@]} )); then
+	   printf " %s\n" "$((i+j+5))) ${servers[i+j+5]}"
+	else
+           printf "\n"
+	fi
+    done
+    echo
+done
+
+printf "\n\n"
+
 read -p "Username: " -e -r user
 getpass 0 "(Primary)" 1>&2
 getpass 1 "(Secondary)" 1>&2
