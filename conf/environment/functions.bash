@@ -14,7 +14,7 @@ banner () {
       printf "%$(tput cols)s\r"
   fi
 
-  IFS= string="$*"
+  string="$*"
   length=$(( ${#string} + 2 ))
 
   colsrowcalc () {

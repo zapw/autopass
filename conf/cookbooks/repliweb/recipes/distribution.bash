@@ -52,11 +52,10 @@ if [[ ! ${src_environment[@]} ]] ; then
      srcenvironment="@(${srcenvironment#*.})"
      printf "\n%s\n%s\n" "Warning! <src_environment> not set" "using hostname's extracted domain name <$decap_srcenvironment> as string to match with </$uripath>"
 else
-    sIFS="$IFS"
     IFS=\|
     decap_srcenvironment="${src_environment[*]}"
     srcenvironment="@(${src_environment[*]})"
-    IFS="${sIFS}"
+    unset -v IFS
 fi
 
 

@@ -47,12 +47,11 @@ else
          for username in "${userlist[@]}"; do
               IFS=: read user password uid gid gecos dir shell <<<"$username"
               printf "%s\n" "${username}" | newusers || continue
-              sudo -u $user cp -a /etc/skel/* "$dir/"
-              if [[ ! ${usernossh["$user"]} ]] ; then
+              sudo -u "$user" cp -a /etc/skel/* "$dir/"
+              if [[ ! ${usernossh[$user]} ]] ; then
                    if (( ${#sshgroups[@]} )) ; then
-		        sIFS="$IFS"
 	                IFS=,; usermod -a -G "${sshgroups[*]}" "$user"
-	                IFS="$sIFS"
+			unset -v IFS
 		  fi
                   if ! egrep -q -r '^AllowUsers.*[[:space:]]+'"$user"'([[:space:]]+|$).*' /etc/ssh/sshd_config ; then
                           if ! egrep -q -r '^AllowGroups' /etc/ssh/sshd_config ; then
@@ -70,9 +69,8 @@ else
               fi
 	      if [[ ! ${usernosudo["$user"]} ]] ; then
 		   if (( ${#sudogroups[@]} )) ; then
-		        sIFS="$IFS"
 	                IFS=,; usermod -a -G "${sudogroups[*]}" "$user"
-	                IFS="$sIFS"
+			unset -v IFS
 		  fi
                   while [[ -f /etc/sudoers.tmp ]] ; do
                          sleep 1
