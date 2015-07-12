@@ -487,7 +487,7 @@ getpass 1 "(Secondary)" 1>&2
 : ${user:=$USER}
 
 
-tmpdir="$(mktemp -d)" || exit 1
+tmpdir="$(mktemp -d)" || exit
 getsudo() {
   local returnval
   empty -s -c -o "$tmpdir/in.fifo" <<<"read -r -s -p Getsudo\$'\n' -a sudopass && printf \"%s\n\" \"\${sudopass[@]}\" | sudo -S -v && { sudo PATH=/bin:/usr/bin:/sbin:/usr/sbin:/usr/local/bin:/usr/local/sbin/bin HISTFILE= /bin/bash --noprofile --noediting --norc -c 'echo Authenticated.; PS1= PS2= HISTFILE= exec /bin/bash --noprofile --noediting --norc';} && exit"
@@ -585,9 +585,9 @@ template_data () {
 
 tail_pid () {
   local pid
-  read -r pid <"$tmpdir/empty.pid" || { echo failed to read 'empty' pid; exit 1; }
+  read -r pid <"$tmpdir/empty.pid" || exit
   #check if empty is alive
-  kill -0 "$pid" 2>/dev/null || exit 1 
+  kill -0 "$pid" 2>/dev/null || exit
 }
 
 checksyntax () {
@@ -688,7 +688,7 @@ for job in "${runlist[@]}" ; do
        cookbook="${cookbooks["$job"]}"
        recipefile="${job##*/}"
        if [[ -x "${cookbookdir}/$cookbook/interactcode/preconnect/$recipefile" ]] ; then
-           inter_pre_arr["${job}"]="$("${cookbookdir}/$cookbook/interactcode/preconnect/$recipefile" "${servers[@]%,*}")" || exit 1
+           inter_pre_arr["${job}"]="$("${cookbookdir}/$cookbook/interactcode/preconnect/$recipefile" "${servers[@]%,*}")" || exit
        fi
        if [[ -x "${cookbookdir}/$cookbook/preconnect/$recipefile" ]] ; then
            pre_arr["$job"]="$(interact_pre_connect="${inter_pre_arr["$job"]}" "${cookbookdir}/$cookbook/preconnect/$recipefile" "${servers[@]%,*}")"
@@ -723,7 +723,7 @@ for server in "${servers[@]}" ; do
 
   export SSH_AGENT_PID=$SSH_AGENT_PID SSH_AUTH_SOCK=$SSH_AUTH_SOCK
   empty -f -i "$tmpdir/in.fifo" -o "$tmpdir/out.fifo" -p "$tmpdir/empty.pid" "${defaultargs[@]}" "${logparam[@]}" \
-	ssh -M -q -o ControlPath="$tmpdir/%h-%p-%r" -o CheckHostIP=no -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o ConnectTimeout="$conntimeo" -t "$user@${connectserv[@]}" "PS1='_prompt_ ' PS2= HISTFILE= /bin/bash --noediting --noprofile --norc" || exit 1
+	ssh -M -q -o ControlPath="$tmpdir/%h-%p-%r" -o CheckHostIP=no -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o ConnectTimeout="$conntimeo" -t "$user@${connectserv[@]}" "PS1='_prompt_ ' PS2= HISTFILE= /bin/bash --noediting --noprofile --norc" || exit
   tail_pid
 
   #check if succesfully logged or if we got a password prompt

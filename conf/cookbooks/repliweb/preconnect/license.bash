@@ -28,9 +28,9 @@ if [[ -d "$repliweblic" ]] ; then
      done
 elif [[ -e "$repliweblic" ]] ; then 
        if file -b "$repliweblic" | grep -q '^Zip[0-9]*' ; then
-	   unzip -qq -aa -c "$repliweblic" 2>/dev/null >"$tmpdir/shared-lic_repliweb.rw" || exit 1
+	   unzip -qq -aa -c "$repliweblic" 2>/dev/null >"$tmpdir/shared-lic_repliweb.rw" || exit
        else 
-	   cp "$repliweblic" "$tmpdir/shared-lic_repliweb.rw" && dos2unix "$tmpdir/shared-lic_repliweb.rw" || exit 1
+	   cp "$repliweblic" "$tmpdir/shared-lic_repliweb.rw" && dos2unix "$tmpdir/shared-lic_repliweb.rw" || exit
        fi
        repliweblicfile_shared_tmp="$tmpdir/shared-lic_repliweb.rw"
 else

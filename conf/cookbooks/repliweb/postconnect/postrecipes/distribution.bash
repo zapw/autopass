@@ -48,7 +48,7 @@ listsvndir () {
             xpath="$wordpress_xpath"
   	    filepath=$wpchksumfile
      fi
-     svn --no-auth-cache --username "$svnusername" --password "$svnpassword" --xml list "${svnurl}/$1" >"$2" || exit 1
+     svn --no-auth-cache --username "$svnusername" --password "$svnpassword" --xml list "${svnurl}/$1" >"$2" || exit
      while read -r var; do 
             index="${var,,}" value="${svnurl}/$1/$var/$filepath" eval "$2"'["$index"]=$value'
      done < <(echo "cat $xpath" | xmllint --shell "$2" | sed -rn 'N;s/.+\n//;p')

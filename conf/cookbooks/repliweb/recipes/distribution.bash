@@ -62,7 +62,7 @@ fi
 homedir="$(getent passwd "$loguser" | awk -F: '{print $6}')"
 if cd "$homedir"; then 
     if [[ -f "$filename" ]]; then
-         rm -f "$filename" || exit 1
+         rm -f "$filename" || exit
     fi
 else
      exit 1
