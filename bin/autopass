@@ -490,7 +490,8 @@ getpass 1 "(Secondary)" 1>&2
 tmpdir="$(mktemp -d)" || exit
 getsudo() {
   local returnval
-  empty -s -c -o "$tmpdir/in.fifo" <<<"read -r -s -p Getsudo\$'\n' -a sudopass && printf \"%s\n\" \"\${sudopass[@]}\" | sudo -S -v && { sudo PATH=/bin:/usr/bin:/sbin:/usr/sbin:/usr/local/bin:/usr/local/sbin/bin HISTFILE= /bin/bash --noprofile --noediting --norc -c 'echo Authenticated.; PS1= PS2= HISTFILE= exec /bin/bash --noprofile --noediting --norc';} && exit"
+  #empty -s -c -o "$tmpdir/in.fifo" <<<"read -r -s -p Getsudo\$'\n' -a sudopass && printf \"%s\n\" \"\${sudopass[@]}\" | sudo -S -v && { sudo PATH=/bin:/usr/bin:/sbin:/usr/sbin:/usr/local/bin:/usr/local/sbin/bin HISTFILE= /bin/bash --noprofile --noediting --norc -c 'echo Authenticated.; PS1= PS2= HISTFILE= exec /bin/bash --noprofile --noediting --norc';} && exit"
+  empty -s -c -o "$tmpdir/in.fifo" <<<"read -r -s -p Getsudo\$'\n' -a sudopass && printf \"%s\n\" \"\${sudopass[@]}\" | sudo -S -v && { sudo HISTFILE= /bin/bash --noprofile --noediting --norc -c 'echo Authenticated.; PS1= PS2= HISTFILE= exec /bin/bash --noprofile --noediting --norc';} && exit"
 
   empty -w -i "$tmpdir/out.fifo" -o "$tmpdir/in.fifo" Getsudo
   returnval=$?
@@ -502,7 +503,8 @@ getsudo() {
       returnval=$?
 
       if (( returnval == 1 )) ; then
-          empty -s -c -o "$tmpdir/in.fifo" <<<"sudo PATH=/bin:/usr/bin:/sbin:/usr/sbin:/usr/local/bin:/usr/local/sbin/bin HISTFILE= /bin/bash --noprofile --noediting --norc -c 'echo Authenticated.; PS1= PS2= HISTFILE= exec /bin/bash --noprofile --noediting --norc' && exit"
+          #empty -s -c -o "$tmpdir/in.fifo" <<<"sudo PATH=/bin:/usr/bin:/sbin:/usr/sbin:/usr/local/bin:/usr/local/sbin/bin HISTFILE= /bin/bash --noprofile --noediting --norc -c 'echo Authenticated.; PS1= PS2= HISTFILE= exec /bin/bash --noprofile --noediting --norc' && exit"
+          empty -s -c -o "$tmpdir/in.fifo" <<<"sudo HISTFILE= /bin/bash --noprofile --noediting --norc -c 'echo Authenticated.; PS1= PS2= HISTFILE= exec /bin/bash --noprofile --noediting --norc' && exit"
 
           empty -w -i "$tmpdir/out.fifo" -o "$tmpdir/in.fifo" 'password for' '' 'Authenticated.' ''
           returnval=$?

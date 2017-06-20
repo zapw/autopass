@@ -17,7 +17,7 @@ mkdir "/home/$username/DenverTraining"
 chown "$username" "/home/$username/DenverTraining"
 cd "/home/$username/DenverTraining"
 
-sudo install_denver="$install_denver" team="$team" git_user="$git_user" username="$username" runuser -u "$username" -- /bin/bash <<'EOXX'
+sudo install_denver="$install_denver" team="$team" git_user="$git_user" username="$username" /usr/sbin/runuser -u "$username" -- /bin/bash -l <<'EOXX'
 
 . /etc/profile.d/git.sh
 git_default_env "$git_user"

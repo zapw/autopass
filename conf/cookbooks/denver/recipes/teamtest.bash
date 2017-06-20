@@ -1,8 +1,6 @@
 #!/bin/bash
 
-sudo username="$username" team="$team" /usr/sbin/runuser -u "$username" -- /bin/bash <<'EOXX'
-cd /home/$username/DenverTraining/services/ || exit 1
-./run_tests
+sudo username="$username" team="$team" runuser -u "$username" -- /bin/bash -l <<'EOXX'
 
 cd /home/$username/DenverTraining/sv_driver || exit 1
 ./load.sh i40e
