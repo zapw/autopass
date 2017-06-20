@@ -5,7 +5,7 @@ conntimeo=30
 conf1="$(readlink -enq "$0")"
 conf1="${conf1%/*/*}/conf"
 
-for conf in ./conf ../conf "$conf1" "$HOME"/.autopass /usr/local/etc/autopass; do
+for conf in "$HOME"/.autopass /usr/local/etc/autopass ./conf ../conf "$conf1"; do
     if [[ -r $conf/config ]]; then
 	 confdir=$(readlink -enq "$conf")
          break
