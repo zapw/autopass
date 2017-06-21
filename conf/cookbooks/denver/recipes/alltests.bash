@@ -1,6 +1,7 @@
 #!/bin/bash
 
-sudo username="$username" team="$team" /usr/sbin/runuser -u "$username" -- /bin/bash <<'EOXX'
+sudo username="$username" team="$team" /usr/sbin/runuser "$username" -- -l <<'EOXX'
+
 cd /home/$username/DenverTraining/services/ || exit 1
 ./run_tests
 
@@ -15,4 +16,12 @@ cd /home/$username/DenverTraining/sv_driver || exit 1
 
 cd "/home/$username/DenverTraining/Denver/teams/$team" || exit 1
 bin/Denver -r bin/GoldenNianticRegression.xml -s bin/GoldenNianticSetup.xml
+
+exit 0
+
 EOXX
+if (($? == 1)); then
+	exit 1
+else
+	exit 0
+fi
