@@ -10,15 +10,19 @@ chmod 400 "/home/$username/.ssh/.${git_user}/id_dsa" || exit 1
 chown "$username" "/home/$username/.ssh/" "/home/$username/.ssh/.${git_user}" "/home/$username/.ssh/.$git_user/id_dsa"
 
 if [[ -d /home/$username/DenverTraining ]]; then
-	cd "/home/$username/" && rm -rf DenverTraining
+	chown -R "$username" "/home/$username/DenverTraining"
+	cd "/home/$username/DenverTraining" || exit 1
+	rm -rf ForNightlyRegression.out install_denver.log Denver services sv_driver 2>/dev/null || true
+else
+	mkdir "/home/$username/DenverTraining"
+	chown "$username" "/home/$username/DenverTraining"
 fi
 
-mkdir "/home/$username/DenverTraining"
-chown "$username" "/home/$username/DenverTraining"
-cd "/home/$username/DenverTraining"
 
 #sudo install_denver="$install_denver" team="$team" git_user="$git_user" username="$username" /usr/sbin/runuser -u "$username" -- /bin/bash -l <<'EOXX'
-sudo install_denver="$install_denver" team="$team" git_user="$git_user" username="$username" /usr/sbin/runuser "$username" -- -l <<'EOXX'
+install_denver="$install_denver" team="$team" git_user="$git_user" username="$username" /usr/sbin/runuser "$username" -- -l <<'EOXXZZZZZZZZZZZ'
+
+cd "/home/$username/DenverTraining" || exit 1
 
 . /etc/profile.d/git.sh
 git_default_env "$git_user"
@@ -31,4 +35,11 @@ if "/home/$username/${install_denver##*/}" -t "$team"; then
 else
 	exit 1
 fi
-EOXX
+EOXXZZZZZZZZZZZ
+
+if [[ $slickproject ]] ; then
+        slickproject_file="$slickproject_file" username="$username" /usr/sbin/runuser "$username" -- -l <<'EOFLLLLLLLXlsas'
+                cd "/home/$username/DenverTraining"
+                /usr/bin/tar -zPxf ../"${slickproject_file##*/}"
+EOFLLLLLLLXlsas
+fi

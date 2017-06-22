@@ -1,6 +1,6 @@
 #!/bin/bash
 
-sudo username="$username" team="$team" /usr/sbin/runuser "$username" -- -l <<'EOXX'
+username="$username" team="$team" /usr/sbin/runuser "$username" -- -l <<'EZXzczxc2OXX'
 
 cd /home/$username/DenverTraining/services/ || exit 1
 ./run_tests
@@ -18,8 +18,8 @@ cd "/home/$username/DenverTraining/Denver/teams/$team" || exit 1
 bin/Denver -r bin/GoldenNianticRegression.xml -s bin/GoldenNianticSetup.xml
 
 exit 0
+EZXzczxc2OXX
 
-EOXX
 if (($? == 1)); then
 	exit 1
 else

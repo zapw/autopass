@@ -5,23 +5,21 @@
 
 sudo username="$username" team="$team" /usr/sbin/runuser "$username" -- -l <<'EOXX'
 
-cd "/home/$username/" && rm -rf .ccache/ 2>/dev/null
-cd /home/"$username"/DenverTraining/ || exit 1
-make -C sv_driver clean
-make -C services clean_lib
-make -C services clean
-make -C "Denver/teams/$team" clean_lib
-make -C "Denver/teams/$team" clean
-
-make -C sv_driver
-make -C services
-make -C "Denver/teams/$team"
-
+cd /home/"$username"/DenverTraining/
+make -C services install || exit 1
+make -C sv_driver install || exit 1
 
 cd /home/"$username"/DenverTraining/sv_driver || exit 1
 
 ./load.sh i40e
 ./load.sh ixgbe -link=1gfull
+
+#cd "/home/$username/DenverTraining/" || exit 1
+#make -C "Denver/teams/$team" clean_lib
+#make -C "Denver/teams/$team" clean
+
+#make -C "Denver/teams/$team"
+
 
 exit 0
 
