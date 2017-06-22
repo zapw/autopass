@@ -36,10 +36,3 @@ else
 	exit 1
 fi
 EOXXZZZZZZZZZZZ
-
-if [[ $slickproject ]] ; then
-        slickproject_file="$slickproject_file" username="$username" /usr/sbin/runuser "$username" -- -l <<'EOFLLLLLLLXlsas'
-                cd "/home/$username/DenverTraining"
-                /usr/bin/tar -zPxf ../"${slickproject_file##*/}"
-EOFLLLLLLLXlsas
-fi
