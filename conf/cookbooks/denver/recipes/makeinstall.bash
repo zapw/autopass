@@ -3,7 +3,7 @@
 
 /usr/bin/chown -R "$username" "/home/$username/DenverTraining/"
 
-sudo username="$username" team="$team" /usr/sbin/runuser "$username" -- -l <<'EOXX'
+username="$username" team="$team" /usr/sbin/runuser "$username" -- -l <<'EOXX'
 
 cd /home/"$username"/DenverTraining/
 make -C services install || exit 1
@@ -14,14 +14,11 @@ cd /home/"$username"/DenverTraining/sv_driver || exit 1
 ./load.sh i40e
 ./load.sh ixgbe -link=1gfull
 
-#cd "/home/$username/DenverTraining/" || exit 1
-#make -C "Denver/teams/$team" clean_lib
-#make -C "Denver/teams/$team" clean
+cd "/home/$username/DenverTraining/" || exit 1
+make -C "Denver/teams/$team" clean_lib
+make -C "Denver/teams/$team" clean
 
-#make -C "Denver/teams/$team"
-
-
-exit 0
+make -C "Denver/teams/$team"
 
 EOXX
 if (($? == 1)); then

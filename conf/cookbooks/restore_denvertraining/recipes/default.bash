@@ -7,14 +7,14 @@ sudo username="$username" team="$team" /usr/sbin/runuser "$username" -- -l <<'EO
 
 cd "/home/$username/" && rm -rf .ccache/ 2>/dev/null
 cd /home/"$username"/DenverTraining/ || exit 1
-make -C sv_driver clean
 make -C services clean_lib
 make -C services clean
+make -C sv_driver clean
 make -C "Denver/teams/$team" clean_lib
 make -C "Denver/teams/$team" clean
 
-make -C sv_driver
 make -C services
+make -C sv_driver
 make -C "Denver/teams/$team"
 
 

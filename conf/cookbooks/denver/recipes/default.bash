@@ -19,10 +19,11 @@ else
 fi
 
 
-#sudo install_denver="$install_denver" team="$team" git_user="$git_user" username="$username" /usr/sbin/runuser -u "$username" -- /bin/bash -l <<'EOXX'
 install_denver="$install_denver" team="$team" git_user="$git_user" username="$username" /usr/sbin/runuser "$username" -- -l <<'EOXXZZZZZZZZZZZ'
 
 cd "/home/$username/DenverTraining" || exit 1
+
+rm -rf ../.ccache 2>/dev/null || true
 
 . /etc/profile.d/git.sh
 git_default_env "$git_user"
@@ -31,6 +32,11 @@ git_default_hooks
 #git_user_env
 
 if "/home/$username/${install_denver##*/}" -t "$team"; then
+
+	cd "/home/$username/DenverTraining/sv_driver/" || exit 1
+	./load.sh i40e
+	./load.sh ixgbe -link=1gfull
+
 	exit 0
 else
 	exit 1

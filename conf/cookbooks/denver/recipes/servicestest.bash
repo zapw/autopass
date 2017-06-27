@@ -5,7 +5,6 @@ username="$username" team="$team" /usr/sbin/runuser "$username" -- -l <<'EZXzczx
 cd /home/$username/DenverTraining/services/ || exit 1
 ./run_tests
 
-exit 0
 EZXzczxc2OXX
 
 if (($? == 1)); then

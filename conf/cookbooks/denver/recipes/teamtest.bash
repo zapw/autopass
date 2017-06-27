@@ -10,13 +10,12 @@ cd "/home/$username/DenverTraining/" || exit 1
 make -C "Denver/teams/$team" clean_lib
 make -C "Denver/teams/$team" clean
 
-make -C "Denver/teams/$team"
+make -C "Denver/teams/$team" || exit 1
 
 cd "/home/$username/DenverTraining/Denver/teams/$team" || exit 1
 bin/Denver -r bin/GoldenRegression.xml -s bin/GoldenSetup.xml
 bin/Denver -r bin/GoldenNianticRegression.xml -s bin/GoldenNianticSetup.xml
 
-exit 0
 EOXXqwewqeCZ
 
 if (($? == 1)); then
