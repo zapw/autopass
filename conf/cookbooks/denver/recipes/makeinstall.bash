@@ -14,11 +14,11 @@ cd /home/"$username"/DenverTraining/sv_driver || exit 1
 ./load.sh i40e
 ./load.sh ixgbe -link=1gfull
 
-cd "/home/$username/DenverTraining/" || exit 1
-make -C "Denver/teams/$team" clean_lib
-make -C "Denver/teams/$team" clean
+#cd "/home/$username/DenverTraining/" || exit 1
+#make -C "Denver/teams/$team" clean_lib
+#make -C "Denver/teams/$team" clean
 
-make -C "Denver/teams/$team"
+#make -C "Denver/teams/$team"
 
 EOXX
 if (($? == 1)); then

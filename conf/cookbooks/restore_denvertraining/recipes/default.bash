@@ -3,7 +3,7 @@
 
 /usr/bin/chown -R "$username" "/home/$username/DenverTraining/"
 
-sudo username="$username" team="$team" /usr/sbin/runuser "$username" -- -l <<'EOXX'
+username="$username" team="$team" /usr/sbin/runuser "$username" -- -l <<'EOXX'
 
 cd "/home/$username/" && rm -rf .ccache/ 2>/dev/null
 cd /home/"$username"/DenverTraining/ || exit 1
