@@ -1,0 +1,9 @@
+if [[ -d /home/public ]]; then
+	mntpoint=$(df -P /home/public/ | awk 'NR > 1 { print $NF }')
+	if awk  '/^[^#]/ { if ($2 == '\""$mntpoint"\"' && ( ! match($4,/(\<|,)acl(\>|,)/) ) )  $4=$4",acl" ; OFS="\t" ;print $1,$2,$3,$4,$5" "$6} /^#/'  </etc/fstab >/etc/fstab.new; then
+		cp /etc/fstab /etc/fstab.bak
+		mv -f /etc/fstab.new /etc/fstab
+		mount -o remount /
+	fi
+	setfacl -m o::rwx,g::rwx,m::rwx -dm o::rwx,g::rwx,m::rwx /home/public
+fi

@@ -1,0 +1,7 @@
+if getent passwd sys_cert >/dev/null; then
+	echo -e "\nUser sys_cert exists"
+	exit 0
+else
+	echo -e "\n User sys_cert does not exist"
+	exit 1
+fi

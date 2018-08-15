@@ -1,7 +1,7 @@
 #!/bin/bash
 #the script uses 'empty' http://empty.sourceforge.net/. Apply included patch or use already included patched version.
 
-conntimeo=30
+conntimeo=5
 conf1="$(readlink -enq "$0")"
 conf1="${conf1%/*/*}/conf"
 
@@ -720,7 +720,8 @@ for server in "${servers[@]}" ; do
 
   #connect to the server
   if (( $stflg != 1 )) ; then
-      printf "\n\n%s\e[4m%s\n\e[0m" "connecting to server " "$server"
+      bold=$(tput bold) reset=$(tput sgr0)
+      printf "\n\n%s%s\n" "connecting to server " "${bold}${server}${reset}"
   fi
 
   export SSH_AGENT_PID=$SSH_AGENT_PID SSH_AUTH_SOCK=$SSH_AUTH_SOCK

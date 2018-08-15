@@ -1,0 +1,3 @@
+#!/bin/bash
+PATH="${0%/*}:$PATH"
+exec ${0%/*}/autopass "$@"
